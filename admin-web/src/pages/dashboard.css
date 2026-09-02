@@ -1,0 +1,126 @@
+.attention {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-bottom: 1.5rem;
+}
+.attention a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.5rem 0.85rem;
+  border-radius: var(--r-md);
+  border: 1px solid rgba(255, 176, 32, 0.32);
+  background: rgba(255, 176, 32, 0.08);
+  color: var(--warn);
+  font-size: 0.83rem;
+  font-weight: 600;
+  transition: background 0.15s;
+}
+.attention a:hover { background: rgba(255, 176, 32, 0.16); }
+.attention a.is-bad {
+  border-color: rgba(255, 77, 77, 0.35);
+  background: rgba(255, 77, 77, 0.08);
+  color: var(--bad);
+}
+.attention a.is-bad:hover { background: rgba(255, 77, 77, 0.16); }
+
+.stat-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  margin-bottom: 1.5rem;
+}
+.stat {
+  position: relative;
+  padding: 1.15rem;
+  border: 1px solid var(--ink-600);
+  border-radius: var(--r-lg);
+  background: var(--ink-850);
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.stat__icon {
+  position: absolute;
+  top: 1.1rem;
+  right: 1.1rem;
+  color: var(--bone-600);
+}
+.stat--ok .stat__icon { color: var(--ok); }
+.stat--ember .stat__icon { color: var(--ember-400); }
+.stat__label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--bone-500);
+}
+.stat__value { font-family: var(--font-display); font-size: 2.1rem; line-height: 1.1; }
+.stat--ember .stat__value { color: var(--ember-300); }
+.stat--ok .stat__value { color: var(--ok); }
+.stat__sub { font-size: 0.78rem; color: var(--bone-500); }
+
+.dash-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 340px 1fr;
+  margin-bottom: 1rem;
+  align-items: start;
+}
+.dash-grid--split { grid-template-columns: 1.4fr 1fr; }
+@media (max-width: 1080px) {
+  .dash-grid, .dash-grid--split { grid-template-columns: 1fr; }
+}
+
+.floor-grid { display: grid; gap: 0.6rem; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); padding: 1rem; }
+.floor-tile {
+  padding: 0.7rem 0.8rem;
+  border-radius: var(--r-md);
+  border: 1px solid var(--ink-500);
+  background: var(--ink-800);
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  border-left-width: 3px;
+}
+.floor-tile strong { font-family: var(--font-mono); font-size: 0.85rem; }
+.floor-tile > span:first-of-type { color: var(--bone-600); font-size: 0.72rem; }
+.floor-tile__who { font-size: 0.78rem; margin-top: 0.25rem; display: flex; flex-direction: column; }
+.floor-tile__who em { font-style: normal; color: var(--bone-600); font-size: 0.72rem; }
+.floor-tile--available { border-left-color: var(--ok); }
+.floor-tile--occupied { border-left-color: var(--warn); background: rgba(255,176,32,0.05); }
+.floor-tile--reserved { border-left-color: var(--info); }
+.floor-tile--maintenance, .floor-tile--offline { border-left-color: var(--bad); opacity: 0.7; }
+
+.next-list { list-style: none; margin: 0; padding: 0; }
+.next-list li {
+  display: grid;
+  grid-template-columns: 80px 1fr auto auto;
+  gap: 0.9rem;
+  align-items: center;
+  padding: 0.8rem 1.25rem;
+  border-bottom: 1px solid var(--ink-700);
+}
+.next-list li:last-child { border-bottom: none; }
+.next-list__time { display: flex; flex-direction: column; }
+.next-list__time strong { font-size: 1rem; }
+.next-list__who { display: flex; flex-direction: column; min-width: 0; }
+.next-list__actions { display: flex; gap: 0.35rem; }
+@media (max-width: 760px) {
+  .next-list li { grid-template-columns: 70px 1fr; }
+  .next-list__actions { grid-column: 1 / -1; }
+}
+
+.mini-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; }
+.mini-stats div { display: flex; flex-direction: column; }
+.mini-stats strong { font-family: var(--font-display); font-size: 1.25rem; }
+
+.chart-tip {
+  background: var(--ink-750);
+  border: 1px solid var(--ink-500);
+  border-radius: var(--r-md);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8rem;
+}
+.chart-tip strong { display: block; margin-bottom: 0.2rem; color: var(--ember-300); }

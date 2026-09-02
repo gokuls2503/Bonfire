@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.venv/
+__pycache__/
+*.pyc
+.env
+.env.local
+.env.production
+backend/media/
+backend/staticfiles/
+.DS_Store
+*.log
+
+.gstack/

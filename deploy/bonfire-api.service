@@ -1,0 +1,34 @@
+# /etc/systemd/system/bonfire-api.service
+# sudo systemctl daemon-reload && sudo systemctl enable --now bonfire-api
+
+[Unit]
+Description=Bonfire Gaming Hub API (gunicorn)
+After=network.target postgresql.service
+Requires=postgresql.service
+
+[Service]
+Type=notify
+User=bonfire
+Group=www-data
+WorkingDirectory=/srv/bonfire/backend
+EnvironmentFile=/srv/bonfire/backend/.env
+ExecStart=/srv/bonfire/backend/.venv/bin/gunicorn config.wsgi:application \
+    --bind 127.0.0.1:8001 \
+    --workers 3 \
+    --timeout 60 \
+    --access-logfile - \
+    --error-logfile -
+ExecReload=/bin/kill -s HUP $MAINPID
+Restart=always
+RestartSec=3
+KillMode=mixed
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/srv/bonfire/backend/media /srv/bonfire/backend/staticfiles
+
+[Install]
+WantedBy=multi-user.target
