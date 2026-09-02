@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useSite } from '../lib/SiteContext'
-import { rupees, duration, formatDateTime, timeUntil, timeLabel } from '../lib/format'
+import { rupees, duration, formatDateTime, timeUntil, timeLabel, whatsappHref } from '../lib/format'
 import Icon from '../components/Icon'
 import './home.css'
 
@@ -383,7 +383,7 @@ function CTA({ settings }) {
           {settings.whatsapp && (
             <a
               className="btn btn--ghost"
-              href={`https://wa.me/${settings.whatsapp.replace(/\D/g, '')}`}
+              href={whatsappHref(settings.whatsapp)}
               target="_blank"
               rel="noreferrer noopener"
             >

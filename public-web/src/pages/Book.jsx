@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useSite } from '../lib/SiteContext'
 import { api, ApiError } from '../lib/api'
-import { rupees, duration, toDateKey, formatDay, formatTime } from '../lib/format'
+import { rupees, duration, toDateKey, formatDay, formatTime, telHref } from '../lib/format'
 import Icon from '../components/Icon'
 import './book.css'
 
@@ -139,7 +139,7 @@ export default function Book() {
           <h2 style={{ marginBottom: '1rem' }}>Online booking is paused</h2>
           <p className="muted">
             Give us a call and we'll sort you out.{' '}
-            {settings.phone && <a href={`tel:${settings.phone}`} className="flame-text">{settings.phone}</a>}
+            {settings.phone && <a href={telHref(settings.phone)} className="flame-text">{settings.phone}</a>}
           </p>
         </div>
       </div>

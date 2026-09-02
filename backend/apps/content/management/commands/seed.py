@@ -69,8 +69,11 @@ class Command(BaseCommand):
             "Weekly tournaments, squad-friendly seating, pay at the counter."
         )
 
-        # Address is fixed; phone/email/socials are left for the owner to fill in
-        # through Admin -> Site content so a fresh install never ships a fake number.
+        # Real contact details, so a fresh install is immediately correct.
+        site.phone = site.phone or "+91 85319 19028"
+        site.whatsapp = site.whatsapp or "918531919028"
+        site.email = site.email or "bonfiregaminghub@gmail.com"
+        site.instagram_url = site.instagram_url or "https://instagram.com/bonfiregaminghub"
         site.address_line1 = site.address_line1 or "Sundarapuram"
         site.city = site.city or "Coimbatore"
         site.state = site.state or "Tamil Nadu"

@@ -51,3 +51,10 @@ export const timeLabel = (value) => {
   const display = hour % 12 === 0 ? 12 : hour % 12
   return m === '00' ? `${display}${suffix}` : `${display}:${m}${suffix}`
 }
+
+/** A tel: URI must not contain spaces — keep the pretty display, strip the href. */
+export const telHref = (phone) => `tel:${String(phone || '').replace(/[^\d+]/g, '')}`
+
+/** wa.me wants digits only, no plus. */
+export const whatsappHref = (number) =>
+  `https://wa.me/${String(number || '').replace(/\D/g, '')}`

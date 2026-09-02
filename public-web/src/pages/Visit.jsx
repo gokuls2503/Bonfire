@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useSite } from '../lib/SiteContext'
 import { api, ApiError } from '../lib/api'
-import { timeLabel } from '../lib/format'
+import { telHref, timeLabel, whatsappHref } from '../lib/format'
 import Icon from '../components/Icon'
 import './visit.css'
 
@@ -132,14 +132,14 @@ export default function Visit() {
                 </a>
               )}
               {s.phone && (
-                <a className="btn btn--ghost btn--sm" href={`tel:${s.phone}`}>
+                <a className="btn btn--ghost btn--sm" href={telHref(s.phone)}>
                   <Icon name="phone" size={16} /> {s.phone}
                 </a>
               )}
               {s.whatsapp && (
                 <a
                   className="btn btn--ghost btn--sm"
-                  href={`https://wa.me/${s.whatsapp.replace(/\D/g, '')}`}
+                  href={whatsappHref(s.whatsapp)}
                   target="_blank"
                   rel="noreferrer noopener"
                 >

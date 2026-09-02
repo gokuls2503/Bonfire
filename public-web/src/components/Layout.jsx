@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
 import { useSite } from '../lib/SiteContext'
-import { timeLabel } from '../lib/format'
+import { telHref, timeLabel } from '../lib/format'
 import Icon from './Icon'
 import './layout.css'
 
@@ -169,7 +169,7 @@ export function Footer() {
           <h4>Find us</h4>
           <ul>
             {s?.full_address && <li className="muted">{s.full_address}</li>}
-            {s?.phone && <li><a href={`tel:${s.phone}`}>{s.phone}</a></li>}
+            {s?.phone && <li><a href={telHref(s.phone)}>{s.phone}</a></li>}
             {s?.email && <li><a href={`mailto:${s.email}`}>{s.email}</a></li>}
           </ul>
         </div>
