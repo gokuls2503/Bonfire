@@ -53,7 +53,7 @@ export default function Customers() {
       <PageHead title="Customers" subtitle={`${total} on record`} />
 
       <div className="toolbar">
-        <input type="search" placeholder="Name, phone or gamer tag…" value={search}
+        <input type="search" placeholder="Code, name, phone or gamer tag…" value={search}
           onChange={(e) => setSearch(e.target.value)} aria-label="Search customers" />
         <select value={tier} onChange={(e) => setTier(e.target.value)} aria-label="Tier">
           <option value="">All tiers</option>
@@ -72,13 +72,14 @@ export default function Customers() {
             <table className="data">
               <thead>
                 <tr>
-                  <th>Name</th><th>Phone</th><th>Tier</th>
+                  <th>Code</th><th>Name</th><th>Phone</th><th>Tier</th>
                   <th>Bookings</th><th>Hours</th><th>Since</th><th></th>
                 </tr>
               </thead>
               <tbody>
                 {items.map((c) => (
                   <tr key={c.id}>
+                    <td className="mono"><strong>{c.code}</strong></td>
                     <td>
                       <strong>{c.full_name}</strong>
                       {c.gamer_tag && <div className="small muted">{c.gamer_tag}</div>}
@@ -116,6 +117,10 @@ export default function Customers() {
       {viewing && (
         <Modal title={viewing.full_name} onClose={() => setViewing(null)} wide>
           <div className="row row--wrap" style={{ gap: '1.5rem', marginBottom: '1.25rem' }}>
+            <div>
+              <span className="small muted">Customer code</span>
+              <div className="mono"><strong>{viewing.code}</strong></div>
+            </div>
             <div><span className="small muted">Phone</span><div className="mono">{viewing.phone}</div></div>
             {viewing.email && <div><span className="small muted">Email</span><div>{viewing.email}</div></div>}
             <div><span className="small muted">Tier</span>

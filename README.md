@@ -51,7 +51,9 @@ so it is safe to re-run.
   steps, respecting opening hours, closures, minimum notice and the booking horizon.
 - **Tournaments** — list, detail page with rules and prize breakdown, and team
   or solo registration
-- **Find my booking** — look up by code, cancel with a matching phone number
+- **Find my booking** — every phone gets a permanent customer code; enter it to
+  see all your bookings, or a full booking code for just one. Cancel any of
+  them with a matching phone number.
 - Gallery, testimonials, FAQ, opening hours, map and contact form
 - All copy, images, hours, rates and contact details come from the API, so the
   owner changes them in the admin, not in code
@@ -148,8 +150,9 @@ Public (no auth, rate-limited on writes):
 GET  /api/public/bootstrap/                 everything the site needs, one call
 GET  /api/public/availability/?date=&duration=&station_type=
 POST /api/public/bookings/                  create a booking
-GET  /api/public/bookings/<code>/           look one up
-POST /api/public/bookings/<code>/cancel/    cancel with a matching phone
+GET  /api/public/bookings/<code>/           customer code -> all their bookings
+                                            full code    -> just that one
+POST /api/public/bookings/<code>/cancel/    cancel one, with a matching phone
 GET  /api/public/tournaments/?scope=upcoming|past|all
 GET  /api/public/tournaments/<slug>/
 POST /api/public/registrations/
@@ -195,6 +198,22 @@ Anything scripting this endpoint needs updating.
 - **Customers are deduplicated by phone** and created automatically on booking or
   tournament registration. The name/phone/email are also denormalised onto each
   booking so the record survives customer deletion.
+- **Booking codes are `<customer code>-<sequence>`** — six hex characters
+  identifying the phone number, then a 3-digit visit number, e.g. `A3F92C-001`.
+  The customer half never changes, so a regular has one code to quote forever.
+  The sequence comes from `Customer.booking_sequence`, a monotonic counter
+  bumped with an atomic `UPDATE` — deliberately **not** `bookings.count()`,
+  because deleting a booking must never let a later one reuse a retired number.
+- **Code lookups are normalised** by `normalise_code()` in
+  `apps/customers/models.py`: case, hyphens and spaces are stripped, so
+  `a3f92c001` and `A3F92C-001` both resolve. `GET /api/public/bookings/<code>/`
+  takes either half and always returns a **list** shape
+  (`{customer_code, full_name, bookings: [...]}`) — a bare customer code lists
+  everything they have booked. Cancelling still needs a full booking code; a
+  customer code is refused rather than guessing which booking was meant.
+- `apps/bookings/models.py` still defines `make_booking_code()`. It is dead
+  code kept only because migration `0001` references it by name — deleting it
+  breaks the migration graph.
 - **A closing time earlier than the opening time means past midnight.** `10:00 →
   00:00` is "open till midnight", and both `_is_open_now()` and the availability
   endpoint handle the wrap.

@@ -411,6 +411,14 @@ export default function Book() {
                 <span className="small muted">Show this at the counter</span>
               </div>
 
+              {confirmation.customer_code && (
+                <p className="small muted">
+                  Your customer code is{' '}
+                  <strong className="flame-text">{confirmation.customer_code}</strong> — quote
+                  it next time and we'll pull up your account.
+                </p>
+              )}
+
               <p className="muted">{confirmation.message}</p>
               <p className="lead">Amount due on arrival: <strong className="flame-text">{rupees(confirmation.amount_due)}</strong></p>
 

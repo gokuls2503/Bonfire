@@ -7,11 +7,22 @@ from django.db import models
 from django.utils import timezone
 
 from apps.catalog.models import PricingPlan, Station, StationType, TimeStamped
-from apps.customers.models import Customer
+from apps.customers.models import Customer, make_customer_code
 
 
 def make_booking_code():
+    """Deprecated. Booking codes are now `<customer code>-<sequence>`.
+
+    Kept only because migration 0001 references it by name; deleting it breaks
+    the migration graph. Nothing in application code should call this.
+    """
     return "BF" + secrets.token_hex(3).upper()
+
+
+def make_orphan_code():
+    """Fallback for a booking with no customer (only possible after a customer
+    is deleted, since `customer` is SET_NULL). Keeps `code` non-empty."""
+    return f"{make_customer_code()}-000"
 
 
 class BusinessHours(models.Model):
@@ -82,7 +93,9 @@ class Booking(TimeStamped):
         WALKIN = "walkin", "Walk-in"
         PHONE = "phone", "Phone"
 
-    code = models.CharField(max_length=12, unique=True, default=make_booking_code, editable=False)
+    # <customer code>-<3-digit sequence>, e.g. A3F92C-001. Assigned in save()
+    # once the customer is resolved from the phone number.
+    code = models.CharField(max_length=12, unique=True, editable=False, blank=True)
     customer = models.ForeignKey(
         Customer, on_delete=models.SET_NULL, null=True, blank=True, related_name="bookings"
     )
@@ -192,6 +205,16 @@ class Booking(TimeStamped):
                 phone=self.phone,
                 defaults={"full_name": self.full_name, "email": self.email},
             )
+        if not self.code:
+            # Only ever assigned once — re-saving must not renumber a booking.
+            self.code = (
+                self.customer.next_booking_code() if self.customer else make_orphan_code()
+            )
         if not self.amount_due and self.pricing_plan_id:
             self.amount_due = self.pricing_plan.price * self.seats
         super().save(*args, **kwargs)
+
+    @property
+    def customer_code(self):
+        """The stable half of the booking code — what a regular quotes."""
+        return self.code.split("-")[0] if self.code else ""

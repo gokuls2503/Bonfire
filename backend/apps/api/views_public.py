@@ -18,6 +18,7 @@ from apps.content.serializers import (
     FAQSerializer, GalleryImageSerializer, PublicContactMessageSerializer,
     SiteSettingsSerializer, TestimonialSerializer,
 )
+from apps.customers.models import CODE_LENGTH, Customer, normalise_code
 from apps.tournaments.models import Tournament
 from apps.tournaments.serializers import (
     PublicRegistrationCreateSerializer, TournamentSerializer,
@@ -214,6 +215,7 @@ class PublicBookingCreate(generics.CreateAPIView):
         return Response(
             {
                 "code": booking.code,
+                "customer_code": booking.customer_code,
                 "status": booking.status,
                 "start_at": booking.start_at,
                 "end_at": booking.end_at,
@@ -226,16 +228,10 @@ class PublicBookingCreate(generics.CreateAPIView):
         )
 
 
-@api_view(["GET"])
-@permission_classes([AllowAny])
-def booking_lookup(request, code):
-    """Let a customer check their own booking with the code they were given."""
-    booking = Booking.objects.filter(code__iexact=code).select_related("station_type").first()
-    if not booking:
-        return Response({"detail": "No booking with that code."}, status=404)
-    return Response({
+def _serialise_booking(booking):
+    return {
         "code": booking.code,
-        "full_name": booking.full_name,
+        "sequence": booking.code.split("-")[-1] if "-" in booking.code else "",
         "status": booking.status,
         "status_display": booking.get_status_display(),
         "station_type": booking.station_type.name,
@@ -245,6 +241,56 @@ def booking_lookup(request, code):
         "seats": booking.seats,
         "amount_due": booking.amount_due,
         "payment_status": booking.payment_status,
+        "can_cancel": booking.status not in ("completed", "cancelled", "no_show"),
+    }
+
+
+def _find_by_code(raw):
+    """Resolve a typed code to (customer_code, name, bookings).
+
+    Accepts a full booking code or the bare customer half, in any case and with
+    or without the hyphen. Returns None when nothing matches.
+    """
+    cleaned = normalise_code(raw)
+    if not cleaned:
+        return None
+
+    recent = timezone.now() - timedelta(days=1)
+    base = Booking.objects.select_related("station_type", "station", "customer")
+
+    # A full code identifies exactly one booking; show only that one.
+    booking = next(
+        (b for b in base.filter(code__istartswith=cleaned[:CODE_LENGTH])
+         if normalise_code(b.code) == cleaned),
+        None,
+    )
+    if booking:
+        return booking.customer_code, booking.full_name, [booking]
+
+    # Otherwise treat it as a customer code and show what is still relevant.
+    customer = Customer.objects.filter(code__iexact=cleaned).first()
+    if customer:
+        bookings = list(
+            base.filter(customer=customer, start_at__gte=recent).order_by("-start_at")
+        )
+        return customer.code, customer.full_name, bookings
+
+    return None
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def booking_lookup(request, code):
+    """Look a customer up by their code, or a single booking by its full code."""
+    found = _find_by_code(code)
+    if not found:
+        return Response({"detail": "No booking or customer with that code."}, status=404)
+
+    customer_code, full_name, bookings = found
+    return Response({
+        "customer_code": customer_code,
+        "full_name": full_name,
+        "bookings": [_serialise_booking(b) for b in bookings],
     })
 
 
@@ -252,7 +298,14 @@ def booking_lookup(request, code):
 @permission_classes([AllowAny])
 @throttle_classes([ScopedRateThrottle])
 def cancel_booking(request, code):
-    booking = Booking.objects.filter(code__iexact=code).first()
+    """Cancel one booking. A bare customer code is refused — with several
+    bookings it would be ambiguous, so the caller must name the exact one."""
+    cleaned = normalise_code(code)
+    booking = next(
+        (b for b in Booking.objects.filter(code__istartswith=cleaned[:CODE_LENGTH])
+         if normalise_code(b.code) == cleaned),
+        None,
+    )
     phone = (request.data.get("phone") or "").strip()
     if not booking or booking.phone != phone:
         return Response({"detail": "Booking code and phone number do not match."}, status=404)

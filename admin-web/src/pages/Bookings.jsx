@@ -291,7 +291,7 @@ export default function Bookings() {
         <select value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Status">
           {STATUSES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select>
-        <input type="search" placeholder="Code, name or phone…" value={search}
+        <input type="search" placeholder="Customer code, booking code, name or phone…" value={search}
           onChange={(e) => setSearch(e.target.value)} aria-label="Search bookings" />
         <span className="spacer" />
         <button className="btn btn--ghost btn--sm" onClick={refresh}>Refresh</button>

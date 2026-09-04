@@ -89,7 +89,7 @@ class CustomerViewSet(StaffViewSet):
     queryset = Customer.objects.all()
     serializer_class = CustomerSerializer
     filterset_fields = ["tier", "marketing_opt_in"]
-    search_fields = ["full_name", "phone", "email", "gamer_tag"]
+    search_fields = ["code", "full_name", "phone", "email", "gamer_tag"]
 
     @action(detail=True, methods=["get"])
     def bookings(self, request, pk=None):
@@ -102,7 +102,7 @@ class BookingViewSet(StaffViewSet):
     queryset = Booking.objects.select_related("station_type", "station", "customer", "pricing_plan")
     serializer_class = BookingSerializer
     filterset_fields = ["status", "payment_status", "station_type", "station", "source"]
-    search_fields = ["code", "full_name", "phone", "email"]
+    search_fields = ["code", "customer__code", "full_name", "phone", "email"]
     ordering_fields = ["start_at", "created_at", "amount_due"]
 
     def get_queryset(self):

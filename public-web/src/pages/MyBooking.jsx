@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, ApiError } from '../lib/api'
-import { rupees, formatDay, formatTime, duration } from '../lib/format'
+import { rupees, formatDay, formatTime } from '../lib/format'
 import Icon from '../components/Icon'
+import './mybooking.css'
 
 const STATUS_TONE = {
   pending: 'tag',
@@ -13,48 +14,130 @@ const STATUS_TONE = {
   no_show: 'tag tag--bad',
 }
 
+function BookingCard({ booking, onCancelled }) {
+  const [confirming, setConfirming] = useState(false)
+  const [phone, setPhone] = useState('')
+  const [error, setError] = useState(null)
+  const [busy, setBusy] = useState(false)
+
+  const cancel = async (event) => {
+    event.preventDefault()
+    if (!phone.trim()) {
+      setError('Enter the phone number on the booking.')
+      return
+    }
+    setBusy(true)
+    setError(null)
+    try {
+      await api.cancelBooking(booking.code, phone.trim())
+      onCancelled(booking.code)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Could not cancel that booking.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <article className={`booking-card ${booking.status === 'cancelled' ? 'is-cancelled' : ''}`}>
+      <header className="booking-card__head">
+        <div>
+          <span className="booking-card__seq">#{booking.sequence || '—'}</span>
+          <strong className="mono">{booking.code}</strong>
+        </div>
+        <span className={STATUS_TONE[booking.status] || 'tag'}>{booking.status_display}</span>
+      </header>
+
+      <dl className="booking-card__meta">
+        <div>
+          <dt>Station</dt>
+          <dd>
+            {booking.station_type}{booking.seats > 1 ? ` × ${booking.seats}` : ''}
+            {booking.station && <span className="flame-text"> · {booking.station}</span>}
+          </dd>
+        </div>
+        <div>
+          <dt>When</dt>
+          <dd>
+            {formatDay(booking.start_at)}
+            <br />
+            {formatTime(booking.start_at)} – {formatTime(booking.end_at)}
+          </dd>
+        </div>
+        <div>
+          <dt>{booking.payment_status === 'paid' ? 'Paid' : 'Due at counter'}</dt>
+          <dd className="flame-text">{rupees(booking.amount_due)}</dd>
+        </div>
+      </dl>
+
+      {booking.can_cancel && (
+        confirming ? (
+          <form className="booking-card__cancel" onSubmit={cancel}>
+            <label htmlFor={`phone-${booking.code}`}>
+              Confirm the phone number on this booking
+            </label>
+            <div className="row">
+              <input
+                id={`phone-${booking.code}`}
+                type="tel"
+                inputMode="tel"
+                autoComplete="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+              />
+              <button className="btn btn--sm" disabled={busy}>
+                {busy ? 'Cancelling…' : 'Cancel it'}
+              </button>
+              <button type="button" className="btn btn--ghost btn--sm"
+                onClick={() => { setConfirming(false); setError(null) }}>
+                Keep it
+              </button>
+            </div>
+            {error && <span className="error small">{error}</span>}
+          </form>
+        ) : (
+          <button className="btn btn--ghost btn--sm" onClick={() => setConfirming(true)}>
+            Cancel this booking
+          </button>
+        )
+      )}
+    </article>
+  )
+}
+
 export default function MyBooking() {
   const [code, setCode] = useState('')
-  const [phone, setPhone] = useState('')
-  const [booking, setBooking] = useState(null)
+  const [result, setResult] = useState(null)
   const [banner, setBanner] = useState(null)
   const [busy, setBusy] = useState(false)
-  const [cancelled, setCancelled] = useState(false)
+  const [cancelled, setCancelled] = useState([])
 
   const lookup = async (event) => {
     event.preventDefault()
     setBanner(null)
+    setCancelled([])
     setBusy(true)
-    setCancelled(false)
     try {
-      setBooking(await api.lookupBooking(code.trim()))
+      setResult(await api.lookupBooking(code.trim()))
     } catch (err) {
-      setBooking(null)
-      setBanner(err instanceof ApiError ? err.message : 'Could not find that booking.')
+      setResult(null)
+      setBanner(err instanceof ApiError ? err.message : 'Could not find that code.')
     } finally {
       setBusy(false)
     }
   }
 
-  const cancel = async () => {
-    if (!phone.trim()) {
-      setBanner('Enter the phone number on the booking to cancel it.')
-      return
-    }
-    setBanner(null)
-    setBusy(true)
-    try {
-      await api.cancelBooking(booking.code, phone.trim())
-      setBooking({ ...booking, status: 'cancelled', status_display: 'Cancelled' })
-      setCancelled(true)
-    } catch (err) {
-      setBanner(err instanceof ApiError ? err.message : 'Could not cancel that booking.')
-    } finally {
-      setBusy(false)
-    }
+  const onCancelled = (cancelledCode) => {
+    setCancelled((v) => [...v, cancelledCode])
+    setResult((r) => ({
+      ...r,
+      bookings: r.bookings.map((b) =>
+        b.code === cancelledCode
+          ? { ...b, status: 'cancelled', status_display: 'Cancelled', can_cancel: false }
+          : b,
+      ),
+    }))
   }
-
-  const canCancel = booking && !['completed', 'cancelled', 'no_show'].includes(booking.status)
 
   return (
     <>
@@ -63,22 +146,28 @@ export default function MyBooking() {
         <div className="shell">
           <span className="eyebrow">Already booked?</span>
           <h1>Find my booking</h1>
-          <p className="lead">Enter the code we gave you to check or cancel your slot.</p>
+          <p className="lead">
+            Enter your code to check or cancel a slot. Your customer code shows
+            everything you have booked; a full code shows just that one visit.
+          </p>
         </div>
       </header>
 
-      <div className="shell section section--tight" style={{ maxWidth: 620 }}>
+      <div className="shell section section--tight" style={{ maxWidth: 720 }}>
         <form className="card" onSubmit={lookup}>
           <div className="field">
-            <label htmlFor="code">Booking code</label>
+            <label htmlFor="code">Booking or customer code</label>
             <input
               id="code"
               required
-              placeholder="BF1A2B3C"
+              placeholder="A3F92C or A3F92C-001"
               value={code}
               onChange={(e) => setCode(e.target.value.toUpperCase())}
-              style={{ fontFamily: 'ui-monospace, Menlo, monospace', letterSpacing: '0.12em' }}
+              className="mono-input"
             />
+            <span className="small muted">
+              Capitals, dashes and spaces don't matter — type it however you have it.
+            </span>
           </div>
           <button className="btn btn--block" disabled={busy}>
             {busy ? 'Looking…' : 'Find booking'}
@@ -86,57 +175,52 @@ export default function MyBooking() {
         </form>
 
         {banner && <div className="notice notice--error" style={{ marginTop: '1.5rem' }}>{banner}</div>}
-        {cancelled && (
+        {cancelled.length > 0 && (
           <div className="notice notice--ok" style={{ marginTop: '1.5rem' }}>
-            Booking cancelled. The slot is back in the pool.
+            {cancelled.length === 1
+              ? 'Booking cancelled. The slot is back in the pool.'
+              : `${cancelled.length} bookings cancelled.`}
           </div>
         )}
 
-        {booking && (
-          <div className="card" style={{ marginTop: '1.5rem' }}>
-            <div className="row" style={{ justifyContent: 'space-between', marginBottom: '1.25rem' }}>
-              <strong style={{ fontFamily: 'ui-monospace, Menlo, monospace', fontSize: '1.3rem', letterSpacing: '0.1em' }}>
-                {booking.code}
-              </strong>
-              <span className={STATUS_TONE[booking.status] || 'tag'}>{booking.status_display}</span>
-            </div>
-
-            <div className="summary-card" style={{ marginBottom: '1.5rem' }}>
-              <div><span className="small muted">Name</span><strong>{booking.full_name}</strong></div>
-              <div><span className="small muted">Station</span>
-                <strong>{booking.station_type}{booking.seats > 1 ? ` × ${booking.seats}` : ''}</strong>
-                {booking.station && <span className="small flame-text">{booking.station}</span>}
+        {result && (
+          <section className="lookup-result">
+            <div className="lookup-result__head">
+              <div>
+                <span className="small muted">Customer code</span>
+                <strong className="mono flame-text">{result.customer_code}</strong>
               </div>
-              <div><span className="small muted">When</span>
-                <strong>{formatDay(booking.start_at)}</strong>
-                <span className="small">{formatTime(booking.start_at)} – {formatTime(booking.end_at)}</span>
-              </div>
-              <div><span className="small muted">
-                {booking.payment_status === 'paid' ? 'Paid' : 'Due at counter'}</span>
-                <strong className="flame-text">{rupees(booking.amount_due)}</strong>
+              <div>
+                <span className="small muted">Name</span>
+                <strong>{result.full_name}</strong>
               </div>
             </div>
 
-            {canCancel ? (
-              <>
-                <div className="field">
-                  <label htmlFor="cancel-phone">Confirm your phone number to cancel</label>
-                  <input
-                    id="cancel-phone"
-                    type="tel"
-                    inputMode="tel"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                  />
-                </div>
-                <button className="btn btn--ghost btn--block" onClick={cancel} disabled={busy}>
-                  Cancel this booking
-                </button>
-              </>
+            {result.bookings.length === 0 ? (
+              <div className="empty">
+                <p>Nothing booked at the moment.</p>
+                <Link to="/book" className="btn btn--sm" style={{ marginTop: '1rem' }}>
+                  Book a station
+                </Link>
+              </div>
             ) : (
-              <Link to="/book" className="btn btn--block">Book another session</Link>
+              <>
+                <p className="small muted" style={{ margin: '0 0 1rem' }}>
+                  {result.bookings.length} booking{result.bookings.length > 1 ? 's' : ''}
+                </p>
+                <div className="booking-list">
+                  {result.bookings.map((b) => (
+                    <BookingCard key={b.code} booking={b} onCancelled={onCancelled} />
+                  ))}
+                </div>
+              </>
             )}
-          </div>
+
+            <p className="small muted lookup-result__tip">
+              <Icon name="flame" size={14} /> Quote <strong>{result.customer_code}</strong> at
+              the counter next time and we'll pull up your account.
+            </p>
+          </section>
         )}
       </div>
     </>

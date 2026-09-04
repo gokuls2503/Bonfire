@@ -1,4 +1,5 @@
 """The endpoints the public site calls. No auth, so the guard rails matter."""
+import re
 from datetime import timedelta
 
 import pytest
@@ -50,7 +51,8 @@ class TestBookingCreation:
         )
         assert res.status_code == 201
         body = res.json()
-        assert body["code"].startswith("BF")
+        assert re.fullmatch(r"[0-9A-F]{6}-001", body["code"])
+        assert body["customer_code"] == body["code"].split("-")[0]
         assert body["status"] == "pending"
         assert float(body["amount_due"]) == 70.0
 
@@ -130,8 +132,9 @@ class TestBookingLookupAndCancel:
     def test_lookup_by_code(self, api, pcs, make_booking):
         booking = make_booking()
         body = api.get(f"/api/public/bookings/{booking.code}/").json()
-        assert body["code"] == booking.code
-        assert body["station_type"] == "Gaming PC"
+        assert body["customer_code"] == booking.customer_code
+        assert [b["code"] for b in body["bookings"]] == [booking.code]
+        assert body["bookings"][0]["station_type"] == "Gaming PC"
 
     def test_lookup_is_case_insensitive(self, api, pcs, make_booking):
         booking = make_booking()

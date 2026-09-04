@@ -2,6 +2,7 @@
 
 It lives in Booking.clean() so staff-created and website bookings obey it equally.
 """
+import re
 from datetime import timedelta
 
 import pytest
@@ -95,7 +96,8 @@ def test_end_at_is_derived_from_duration(make_booking):
     assert booking.end_at == booking.start_at + timedelta(minutes=90)
 
 
-def test_booking_code_is_unique_and_prefixed(pcs, make_booking):
+def test_booking_code_is_unique_and_derived_from_the_customer(pcs, make_booking):
+    """Five different phones -> five customers -> five distinct -001 codes."""
     codes = {make_booking(phone=f"98000001{i:02d}", seats=1).code for i in range(5)}
     assert len(codes) == 5
-    assert all(code.startswith("BF") for code in codes)
+    assert all(re.fullmatch(r"[0-9A-F]{6}-001", code) for code in codes)
