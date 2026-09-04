@@ -6,6 +6,7 @@ import Shell from './components/Shell'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Bookings from './pages/Bookings'
+import Sales from './pages/Sales'
 import Floor from './pages/Floor'
 import Stations from './pages/Stations'
 import Pricing from './pages/Pricing'
@@ -43,6 +44,7 @@ function Console() {
       <Routes>
         <Route path="/" element={<Dashboard onData={onDashboard} />} />
         <Route path="/bookings" element={<Bookings />} />
+        <Route path="/sales" element={<Sales />} />
         <Route path="/floor" element={<Floor />} />
         <Route path="/stations" element={<Stations />} />
         <Route path="/pricing" element={<Pricing />} />

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { api } from '../lib/api'
 import { formatTime, rupees } from '../lib/format'
 import { Loading, PageHead, Pill, STATUS_TONE, useToast } from '../components/ui'
+import PaymentModal from '../components/PaymentModal'
 import Icon from '../components/Icon'
 import './floor.css'
 
@@ -16,6 +17,7 @@ const NEXT_STATUS = {
 export default function Floor() {
   const [data, setData] = useState(null)
   const [busy, setBusy] = useState(null)
+  const [paying, setPaying] = useState(null)
   const toast = useToast()
 
   const load = async () => {
@@ -113,9 +115,8 @@ export default function Floor() {
                     </div>
                   </div>
                   <span className="spacer" />
-                  <button className="btn btn--sm" disabled={busy === `b${b.id}`}
-                    onClick={() => act(b, 'complete', 'completed & paid')}>
-                    Complete
+                  <button className="btn btn--sm" onClick={() => setPaying(b)}>
+                    Close out
                   </button>
                 </li>
               ))}
@@ -154,6 +155,14 @@ export default function Floor() {
           )}
         </section>
       </div>
+
+      {paying && (
+        <PaymentModal
+          booking={paying}
+          onClose={() => setPaying(null)}
+          onDone={() => { setPaying(null); load() }}
+        />
+      )}
     </>
   )
 }

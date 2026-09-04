@@ -60,10 +60,15 @@ so it is safe to re-run.
 - **Dashboard** — today's bookings, who's playing, revenue, 7-day trend, live
   floor map, "needs attention" queue, next tournament
 - **Bookings** — filter by date/status/search, create walk-ins, and the full
-  lifecycle: confirm → check in → complete (which frees the station and records
-  payment), plus cancel and no-show
+  lifecycle: confirm → check in → close out (which frees the station and records
+  how the money was taken), plus cancel and no-show
+- **Sales** — daily takings split into **cash and online**, over today,
+  yesterday, 7/30 days, this or last month, or any custom range. Stacked daily
+  chart, payment mix, revenue per platform, tournament entry fees counted
+  separately, outstanding balances you can settle in place, a full transaction
+  list for reconciling the till, and CSV export.
 - **Floor** — one tap per station to flip it between available and maintenance;
-  complete a session or check someone in without leaving the screen
+  close out a session or check someone in without leaving the screen
 - **Stations** — add platforms (Gaming PC, PS5, and whatever comes next) and
   individual stations. New hardware immediately increases public booking capacity.
 - **Pricing** — per-platform plans with badges, happy-hour windows and struck-through prices
@@ -155,17 +160,27 @@ Admin (staff JWT via `POST /api/auth/token/`):
 
 ```
 GET   /api/admin/dashboard/
+GET   /api/admin/sales/                  ?preset=today|yesterday|7d|30d|month|
+                                          last_month  — or ?from=&to=
+GET   /api/admin/sales/transactions/     same range params, plus ?method=
 CRUD  /api/admin/{bookings,stations,station-types,pricing-plans,games,customers,
                   tournaments,registrations,gallery,testimonials,faqs,
                   business-hours,closures,messages}/
 GET   /api/admin/site-settings/     PATCH to edit (multipart for images)
 POST  /api/admin/bookings/<id>/{confirm,check_in,complete,cancel,no_show}/
+POST  /api/admin/bookings/<id>/record_payment/    settle an unpaid balance
 POST  /api/admin/stations/<id>/set_status/
 POST  /api/admin/tournaments/<id>/duplicate/
 POST  /api/admin/registrations/<id>/set_status/
 ```
 
 Access tokens last 8 hours and refresh automatically in the admin app.
+
+**`complete` requires a payment method.** `POST /api/admin/bookings/<id>/complete/`
+returns 400 unless the body carries `payment_method` (`cash`, `upi`, `card` or
+`other`), or sets `payment_status` to `waived` or `unpaid`. Without it the
+cash/online split would silently drift, so it is enforced rather than defaulted.
+Anything scripting this endpoint needs updating.
 
 ---
 
@@ -183,5 +198,17 @@ Access tokens last 8 hours and refresh automatically in the admin app.
 - **A closing time earlier than the opening time means past midnight.** `10:00 →
   00:00` is "open till midnight", and both `_is_open_now()` and the availability
   endpoint handle the wrap.
+- **Sales revenue is recognised on `completed_at`**, falling back to `start_at`
+  for rows completed before that field existed (`apps/api/sales.py`). Money is
+  counted when it changed hands, not when the slot was booked, so a sales figure
+  will not match a naive `SUM(amount_collected)` grouped by `start_at`.
+- **The counter offers Cash and UPI only** — two buttons is faster during a rush.
+  `card` and `other` remain valid in `Booking.PaymentMethod` and in
+  `ONLINE_METHODS`, so a card machine is one line in
+  `admin-web/src/components/PaymentModal.jsx` with no migration; existing rows
+  and the report already handle them.
+- **Nothing fake is ever seeded.** `manage.py seed` creates the cafe's real
+  configuration but no takings, so the Sales page starts genuinely empty and
+  every number on it is money you actually took.
 - The supplied logo ships on a solid black plate; both front-ends drop it out with
   `mix-blend-mode: lighten` rather than requiring a re-cut PNG.

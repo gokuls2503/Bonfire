@@ -10,6 +10,7 @@ const NAV = [
     items: [
       { to: '/', label: 'Dashboard', icon: 'bolt', end: true },
       { to: '/bookings', label: 'Bookings', icon: 'calendar' },
+      { to: '/sales', label: 'Sales', icon: 'flame' },
       { to: '/floor', label: 'Floor', icon: 'monitor' },
       { to: '/customers', label: 'Customers', icon: 'users' },
     ],

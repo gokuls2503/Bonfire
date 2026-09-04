@@ -35,7 +35,8 @@ class BookingSerializer(serializers.ModelSerializer):
             "id", "code", "customer", "full_name", "phone", "email", "station_type",
             "station_type_name", "station", "station_name", "pricing_plan", "start_at",
             "end_at", "duration_minutes", "seats", "status", "status_display",
-            "payment_status", "amount_due", "amount_collected", "source", "notes",
+            "payment_status", "payment_method", "amount_due", "amount_collected",
+            "source", "notes",
             "staff_notes", "checked_in_at", "completed_at", "created_at",
         ]
         read_only_fields = ["code", "created_at"]

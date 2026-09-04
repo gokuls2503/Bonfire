@@ -84,6 +84,9 @@ export default function Dashboard({ onData }) {
           </p>
         </div>
         <span className="spacer" />
+        <Link to="/sales" className="btn btn--ghost">
+          <Icon name="flame" size={15} /> {rupees(data.month.revenue)} this month
+        </Link>
         <Link to="/bookings?new=1" className="btn">
           <Icon name="calendar" size={15} /> New booking
         </Link>
@@ -120,7 +123,8 @@ export default function Dashboard({ onData }) {
         <Stat icon="bolt" label="Playing now" value={data.today.checked_in}
           sub={`${data.stations.available} of ${data.stations.total} stations free`} tone="ok" />
         <Stat icon="flame" label="Revenue today" value={rupees(data.today.revenue)}
-          sub={`${rupees(data.month.revenue)} this month`} tone="ember" />
+          sub={`${rupees(data.today.cash)} cash · ${rupees(data.today.online)} online`}
+          tone="ember" />
         <Stat icon="users" label="Customers" value={data.customers.total}
           sub={`+${data.customers.new_this_week} this week`} />
       </div>

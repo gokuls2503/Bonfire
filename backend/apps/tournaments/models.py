@@ -93,8 +93,14 @@ class TournamentRegistration(TimeStamped):
 
     class PaymentStatus(models.TextChoices):
         UNPAID = "unpaid", "Unpaid"
-        PAID = "paid", "Paid at counter"
+        PAID = "paid", "Paid"
         WAIVED = "waived", "Waived"
+
+    class PaymentMethod(models.TextChoices):
+        CASH = "cash", "Cash"
+        UPI = "upi", "UPI"
+        CARD = "card", "Card"
+        OTHER = "other", "Other"
 
     tournament = models.ForeignKey(
         Tournament, on_delete=models.CASCADE, related_name="registrations"
@@ -113,6 +119,14 @@ class TournamentRegistration(TimeStamped):
     payment_status = models.CharField(
         max_length=10, choices=PaymentStatus.choices, default=PaymentStatus.UNPAID
     )
+    payment_method = models.CharField(
+        max_length=10, choices=PaymentMethod.choices, blank=True
+    )
+    amount_paid = models.DecimalField(
+        max_digits=8, decimal_places=2, default=0,
+        help_text="Entry fee actually collected.",
+    )
+    paid_at = models.DateTimeField(null=True, blank=True)
     seed = models.PositiveSmallIntegerField(null=True, blank=True)
     final_position = models.PositiveSmallIntegerField(null=True, blank=True)
     staff_notes = models.TextField(blank=True)

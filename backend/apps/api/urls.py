@@ -2,6 +2,7 @@ from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView, TokenVerifyView
 
+from . import sales as sales_views
 from . import views_admin as adm
 from . import views_public as pub
 
@@ -35,6 +36,8 @@ public_patterns = [
 
 admin_patterns = [
     path("dashboard/", adm.dashboard, name="admin-dashboard"),
+    path("sales/", sales_views.sales, name="admin-sales"),
+    path("sales/transactions/", sales_views.sales_transactions, name="admin-sales-transactions"),
     path("me/", adm.me, name="admin-me"),
     path("site-settings/", adm.SiteSettingsView.as_view(), name="admin-site-settings"),
     path("", include(router.urls)),

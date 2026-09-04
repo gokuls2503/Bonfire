@@ -37,6 +37,7 @@ class TournamentRegistrationSerializer(serializers.ModelSerializer):
         fields = [
             "id", "tournament", "tournament_title", "customer", "team_name", "captain_name",
             "phone", "email", "roster", "status", "status_display", "payment_status",
+            "payment_method", "amount_paid", "paid_at",
             "seed", "final_position", "staff_notes", "created_at",
         ]
 

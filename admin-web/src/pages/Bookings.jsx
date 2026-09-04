@@ -7,6 +7,7 @@ import {
   ConfirmModal, Empty, Input, Loading, Modal, PageHead, Pill, Select,
   STATUS_TONE, Textarea, useToast,
 } from '../components/ui'
+import PaymentModal from '../components/PaymentModal'
 import Icon from '../components/Icon'
 
 const STATUSES = [
@@ -201,6 +202,8 @@ export default function Bookings() {
   const [editing, setEditing] = useState(null)
   const [creating, setCreating] = useState(params.get('new') === '1')
   const [deleting, setDeleting] = useState(null)
+  const [paying, setPaying] = useState(null)
+  const [settling, setSettling] = useState(null)
   const [busy, setBusy] = useState(null)
   const toast = useToast()
 
@@ -327,7 +330,11 @@ export default function Bookings() {
                     <td>
                       <Pill tone={STATUS_TONE[b.status]}>{b.status_display}</Pill>
                       <div style={{ marginTop: '0.25rem' }}>
-                        <Pill tone={STATUS_TONE[b.payment_status]}>{b.payment_status}</Pill>
+                        <Pill tone={STATUS_TONE[b.payment_status]}>
+                          {b.payment_status === 'paid' && b.payment_method
+                            ? b.payment_method === 'cash' ? 'Cash' : b.payment_method.toUpperCase()
+                            : b.payment_status}
+                        </Pill>
                       </div>
                     </td>
                     <td className="nowrap">
@@ -346,8 +353,13 @@ export default function Bookings() {
                           onClick={() => act(b, 'check_in', 'checked in')}>Check in</button>
                       )}
                       {b.status === 'checked_in' && (
-                        <button className="btn btn--sm" disabled={busy === `${b.id}-complete`}
-                          onClick={() => act(b, 'complete', 'completed')}>Complete</button>
+                        <button className="btn btn--sm" onClick={() => setPaying(b)}>
+                          Close out
+                        </button>
+                      )}
+                      {b.status === 'completed' && b.payment_status === 'unpaid' && (
+                        <button className="btn btn--sm"
+                          onClick={() => setSettling(b)}>Take payment</button>
                       )}
                       <button className="btn btn--ghost btn--sm" onClick={() => setEditing(b)}>Edit</button>
                       {!['completed', 'cancelled'].includes(b.status) && (
@@ -382,6 +394,15 @@ export default function Bookings() {
           onConfirm={remove}
           onClose={() => setDeleting(null)}
           busy={busy === 'delete'}
+        />
+      )}
+
+      {(paying || settling) && (
+        <PaymentModal
+          booking={paying || settling}
+          mode={settling ? 'settle' : 'complete'}
+          onClose={() => { setPaying(null); setSettling(null) }}
+          onDone={() => { setPaying(null); setSettling(null); refresh() }}
         />
       )}
     </>

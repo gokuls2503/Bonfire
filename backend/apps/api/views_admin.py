@@ -149,17 +149,56 @@ class BookingViewSet(StaffViewSet):
 
     @action(detail=True, methods=["post"])
     def complete(self, request, pk=None):
+        """End the session and record how the money was taken.
+
+        `payment_method` drives the cash/online split in the sales report, so it
+        is required unless the session is explicitly waived or left unpaid.
+        """
         booking = self.get_object()
         collected = request.data.get("amount_collected", booking.amount_due)
+        payment_status = request.data.get("payment_status", Booking.PaymentStatus.PAID)
+        method = request.data.get("payment_method", "")
+
+        if payment_status == Booking.PaymentStatus.PAID:
+            if method not in dict(Booking.PaymentMethod.choices):
+                return Response(
+                    {"payment_method": "Choose how the payment was taken: cash, upi, card or other."},
+                    status=400,
+                )
+        else:
+            method = ""
+            if payment_status == Booking.PaymentStatus.UNPAID:
+                collected = 0
+
         if booking.station_id:
             Station.objects.filter(pk=booking.station_id).update(status=Station.Status.AVAILABLE)
+
         return self._transition(
             booking,
             Booking.Status.COMPLETED,
             completed_at=timezone.now(),
             amount_collected=Decimal(str(collected)),
-            payment_status=Booking.PaymentStatus.PAID,
+            payment_status=payment_status,
+            payment_method=method,
         )
+
+    @action(detail=True, methods=["post"])
+    def record_payment(self, request, pk=None):
+        """Settle an outstanding balance without touching the booking's status."""
+        booking = self.get_object()
+        method = request.data.get("payment_method", "")
+        if method not in dict(Booking.PaymentMethod.choices):
+            return Response({"payment_method": "Choose a payment method."}, status=400)
+        collected = Decimal(str(request.data.get("amount_collected", booking.amount_due)))
+        booking.payment_status = Booking.PaymentStatus.PAID
+        booking.payment_method = method
+        booking.amount_collected = collected
+        if not booking.completed_at:
+            booking.completed_at = timezone.now()
+        booking.save(update_fields=[
+            "payment_status", "payment_method", "amount_collected", "completed_at", "updated_at",
+        ])
+        return Response(BookingSerializer(booking).data)
 
     @action(detail=True, methods=["post"])
     def cancel(self, request, pk=None):
@@ -216,8 +255,20 @@ class TournamentRegistrationViewSet(StaffViewSet):
         if new_status not in dict(TournamentRegistration.Status.choices):
             return Response({"detail": "Unknown status."}, status=400)
         reg.status = new_status
+
         if "payment_status" in request.data:
             reg.payment_status = request.data["payment_status"]
+            if reg.payment_status == "paid":
+                method = request.data.get("payment_method", "")
+                if method not in dict(TournamentRegistration.PaymentMethod.choices):
+                    return Response(
+                        {"payment_method": "Choose how the entry fee was taken."}, status=400
+                    )
+                reg.payment_method = method
+                reg.amount_paid = Decimal(
+                    str(request.data.get("amount_paid", reg.tournament.entry_fee))
+                )
+                reg.paid_at = reg.paid_at or timezone.now()
         reg.save()
         return Response(TournamentRegistrationSerializer(reg).data)
 
@@ -311,6 +362,11 @@ def dashboard(request):
     ]
 
     revenue_today = completed_today.aggregate(t=Sum("amount_collected"))["t"] or 0
+    cash_today = completed_today.filter(payment_method="cash").aggregate(
+        t=Sum("amount_collected"))["t"] or 0
+    online_today = completed_today.filter(
+        payment_method__in=["upi", "card", "other"]
+    ).aggregate(t=Sum("amount_collected"))["t"] or 0
     revenue_month = Booking.objects.filter(
         status="completed", start_at__date__gte=month_start
     ).aggregate(t=Sum("amount_collected"))["t"] or 0
@@ -350,6 +406,8 @@ def dashboard(request):
             "completed": completed_today.count(),
             "no_show": todays.filter(status="no_show").count(),
             "revenue": float(revenue_today),
+            "cash": float(cash_today),
+            "online": float(online_today),
         },
         "month": {
             "revenue": float(revenue_month),

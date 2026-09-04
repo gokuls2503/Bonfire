@@ -63,8 +63,19 @@ class Booking(TimeStamped):
 
     class PaymentStatus(models.TextChoices):
         UNPAID = "unpaid", "Unpaid"
-        PAID = "paid", "Paid at counter"
+        PAID = "paid", "Paid"
         WAIVED = "waived", "Waived"
+
+    class PaymentMethod(models.TextChoices):
+        CASH = "cash", "Cash"
+        UPI = "upi", "UPI"
+        CARD = "card", "Card"
+        OTHER = "other", "Other"
+
+        @classmethod
+        def online(cls):
+            """Everything that is not physical cash, for the sales split."""
+            return [cls.UPI, cls.CARD, cls.OTHER]
 
     class Source(models.TextChoices):
         WEBSITE = "website", "Website"
@@ -99,7 +110,12 @@ class Booking(TimeStamped):
 
     status = models.CharField(max_length=12, choices=Status.choices, default=Status.PENDING, db_index=True)
     payment_status = models.CharField(
-        max_length=10, choices=PaymentStatus.choices, default=PaymentStatus.UNPAID
+        max_length=10, choices=PaymentStatus.choices, default=PaymentStatus.UNPAID,
+        db_index=True,
+    )
+    payment_method = models.CharField(
+        max_length=10, choices=PaymentMethod.choices, blank=True,
+        help_text="How the money was taken. Blank until payment is recorded.",
     )
     amount_due = models.DecimalField(max_digits=9, decimal_places=2, default=0)
     amount_collected = models.DecimalField(max_digits=9, decimal_places=2, default=0)
@@ -119,6 +135,15 @@ class Booking(TimeStamped):
     @property
     def end_at(self):
         return self.start_at + timedelta(minutes=self.duration_minutes)
+
+    @property
+    def settled_at(self):
+        """When the cash actually changed hands, for daily sales reporting."""
+        return self.completed_at or self.start_at
+
+    @property
+    def is_online_payment(self):
+        return self.payment_method in Booking.PaymentMethod.online()
 
     @property
     def is_active_now(self):

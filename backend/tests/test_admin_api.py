@@ -101,7 +101,8 @@ class TestBookingLifecycle:
         station = pcs[0]
         staff_api.post(f"/api/admin/bookings/{booking.id}/check_in/",
                        {"station": station.id}, format="json")
-        res = staff_api.post(f"/api/admin/bookings/{booking.id}/complete/", {}, format="json")
+        res = staff_api.post(f"/api/admin/bookings/{booking.id}/complete/",
+                             {"payment_method": "cash"}, format="json")
 
         assert res.status_code == 200
         booking.refresh_from_db()
@@ -115,9 +116,10 @@ class TestBookingLifecycle:
     def test_complete_accepts_a_different_amount(self, staff_api, pcs, make_booking):
         booking = make_booking(amount_due="70.00")
         staff_api.post(f"/api/admin/bookings/{booking.id}/complete/",
-                       {"amount_collected": "50.00"}, format="json")
+                       {"amount_collected": "50.00", "payment_method": "upi"}, format="json")
         booking.refresh_from_db()
         assert float(booking.amount_collected) == 50.0
+        assert booking.payment_method == Booking.PaymentMethod.UPI
 
     def test_cancel_releases_the_station(self, staff_api, pcs, make_booking):
         booking = make_booking()
@@ -248,9 +250,14 @@ class TestTournamentAdmin:
         reg = TournamentRegistration.objects.create(
             tournament=tournament, team_name="Solo", captain_name="A", phone="9871110000",
         )
-        res = staff_api.post(f"/api/admin/registrations/{reg.id}/set_status/",
-                             {"status": "confirmed", "payment_status": "paid"}, format="json")
+        res = staff_api.post(
+            f"/api/admin/registrations/{reg.id}/set_status/",
+            {"status": "confirmed", "payment_status": "paid", "payment_method": "cash"},
+            format="json",
+        )
         assert res.status_code == 200
         reg.refresh_from_db()
         assert reg.status == TournamentRegistration.Status.CONFIRMED
         assert reg.payment_status == TournamentRegistration.PaymentStatus.PAID
+        assert reg.payment_method == "cash"
+        assert reg.paid_at is not None
