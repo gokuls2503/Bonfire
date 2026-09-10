@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     "apps.bookings",
     "apps.tournaments",
     "apps.content",
+    "apps.shop",
 ]
 
 MIDDLEWARE = [

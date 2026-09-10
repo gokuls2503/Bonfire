@@ -5,6 +5,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from . import sales as sales_views
 from . import views_admin as adm
 from . import views_public as pub
+from . import views_shop as shop
 
 router = DefaultRouter()
 router.register("station-types", adm.StationTypeViewSet, basename="station-type")
@@ -21,6 +22,10 @@ router.register("faqs", adm.FAQViewSet, basename="faq")
 router.register("business-hours", adm.BusinessHoursViewSet, basename="business-hours")
 router.register("closures", adm.ClosureViewSet, basename="closure")
 router.register("messages", adm.ContactMessageViewSet, basename="message")
+router.register("product-categories", shop.ProductCategoryViewSet, basename="product-category")
+router.register("products", shop.ProductViewSet, basename="product")
+router.register("bill-items", shop.BillItemViewSet, basename="bill-item")
+router.register("counter-sales", shop.CounterSaleViewSet, basename="counter-sale")
 
 public_patterns = [
     path("bootstrap/", pub.site_bootstrap, name="public-bootstrap"),
@@ -38,6 +43,8 @@ admin_patterns = [
     path("dashboard/", adm.dashboard, name="admin-dashboard"),
     path("sales/", sales_views.sales, name="admin-sales"),
     path("sales/transactions/", sales_views.sales_transactions, name="admin-sales-transactions"),
+    path("shop/summary/", shop.shop_summary, name="admin-shop-summary"),
+    path("shop/quick-sale/", shop.quick_sale, name="admin-shop-quick-sale"),
     path("me/", adm.me, name="admin-me"),
     path("site-settings/", adm.SiteSettingsView.as_view(), name="admin-site-settings"),
     path("", include(router.urls)),

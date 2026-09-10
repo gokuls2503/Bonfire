@@ -10,6 +10,7 @@ const NAV = [
     items: [
       { to: '/', label: 'Dashboard', icon: 'bolt', end: true },
       { to: '/bookings', label: 'Bookings', icon: 'calendar' },
+      { to: '/counter-sale', label: 'Counter sale', icon: 'ticket' },
       { to: '/sales', label: 'Sales', icon: 'flame' },
       { to: '/floor', label: 'Floor', icon: 'monitor' },
       { to: '/customers', label: 'Customers', icon: 'users' },
@@ -26,6 +27,7 @@ const NAV = [
     section: 'Setup',
     items: [
       { to: '/stations', label: 'Stations', icon: 'gamepad' },
+      { to: '/products', label: 'Shop items', icon: 'star' },
       { to: '/pricing', label: 'Pricing', icon: 'bolt' },
       { to: '/hours', label: 'Hours & closures', icon: 'clock' },
       { to: '/games', label: 'Game library', icon: 'star' },

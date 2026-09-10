@@ -28,6 +28,10 @@ class BookingSerializer(serializers.ModelSerializer):
     station_name = serializers.CharField(source="station.name", read_only=True, default=None)
     status_display = serializers.CharField(source="get_status_display", read_only=True)
     end_at = serializers.DateTimeField(read_only=True)
+    customer_code = serializers.CharField(read_only=True)
+    items_total = serializers.DecimalField(max_digits=9, decimal_places=2, read_only=True)
+    total_due = serializers.DecimalField(max_digits=9, decimal_places=2, read_only=True)
+    items = serializers.SerializerMethodField()
 
     class Meta:
         model = Booking
@@ -36,10 +40,18 @@ class BookingSerializer(serializers.ModelSerializer):
             "station_type_name", "station", "station_name", "pricing_plan", "start_at",
             "end_at", "duration_minutes", "seats", "status", "status_display",
             "payment_status", "payment_method", "amount_due", "amount_collected",
+            "items", "items_total", "total_due", "customer_code",
             "source", "notes",
             "staff_notes", "checked_in_at", "completed_at", "created_at",
         ]
         read_only_fields = ["code", "created_at"]
+
+    def get_items(self, obj):
+        # Imported here: apps.shop imports bookings, so a module-level import
+        # would be circular.
+        from apps.shop.serializers import BillItemSerializer
+
+        return BillItemSerializer(obj.items.all(), many=True).data
 
     def validate(self, attrs):
         instance = Booking(**{**self._instance_data(), **attrs})

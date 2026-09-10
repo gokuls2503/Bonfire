@@ -218,3 +218,20 @@ class Booking(TimeStamped):
     def customer_code(self):
         """The stable half of the booking code — what a regular quotes."""
         return self.code.split("-")[0] if self.code else ""
+
+    @property
+    def items_total(self):
+        """Snacks, drinks and rented kit added to this bill."""
+        from decimal import Decimal
+
+        return sum((i.line_total for i in self.items.all()), Decimal("0.00"))
+
+    @property
+    def total_due(self):
+        """Station time plus everything on the bill — what the customer actually pays."""
+        return self.amount_due + self.items_total
+
+    def release_rentals(self):
+        """Hand rented kit back to the pool. Called when a bill is closed."""
+        for item in self.items.filter(returned_at__isnull=True):
+            item.mark_returned()

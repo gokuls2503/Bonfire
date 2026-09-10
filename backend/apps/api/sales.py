@@ -14,6 +14,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 
 from apps.bookings.models import Booking
+from apps.shop.models import BillItem, CounterSale
 from apps.tournaments.models import TournamentRegistration
 
 from .permissions import IsStaffUser
@@ -96,6 +97,15 @@ def _paid_registrations(begin, finish):
     )
 
 
+def _paid_counter_sales(begin, finish):
+    """Walk-in shop sales with no station booked."""
+    return (
+        CounterSale.objects.filter(payment_status="paid")
+        .annotate(settled=Coalesce("completed_at", "created_at"))
+        .filter(settled__gte=begin, settled__lt=finish)
+    )
+
+
 @api_view(["GET"])
 @permission_classes([IsStaffUser])
 def sales(request):
@@ -106,14 +116,22 @@ def sales(request):
 
     bookings = _settled_bookings(begin, finish)
     registrations = _paid_registrations(begin, finish)
+    counter_sales = _paid_counter_sales(begin, finish)
 
     booking_total = bookings.aggregate(t=_money(Sum("amount_collected")))["t"]
     entry_total = registrations.aggregate(t=_money(Sum("amount_paid")))["t"]
+    counter_total = counter_sales.aggregate(t=_money(Sum("amount_collected")))["t"]
     sessions = bookings.count()
 
-    # ---- split by method, bookings and entry fees combined ----
+    # ---- split by method: bookings, entry fees and counter sales combined ----
     per_method = {key: {"amount": Decimal("0"), "count": 0} for key in METHOD_LABELS}
     for row in bookings.values("payment_method").annotate(
+        amount=_money(Sum("amount_collected")), count=Count("id")
+    ):
+        bucket = per_method[row["payment_method"] or ""]
+        bucket["amount"] += row["amount"]
+        bucket["count"] += row["count"]
+    for row in counter_sales.values("payment_method").annotate(
         amount=_money(Sum("amount_collected")), count=Count("id")
     ):
         bucket = per_method[row["payment_method"] or ""]
@@ -126,7 +144,7 @@ def sales(request):
         bucket["amount"] += row["amount"]
         bucket["count"] += row["count"]
 
-    grand_total = booking_total + entry_total
+    grand_total = booking_total + entry_total + counter_total
     cash_total = per_method["cash"]["amount"]
     online_total = sum(per_method[m]["amount"] for m in ONLINE_METHODS)
     unrecorded_total = per_method[""]["amount"]
@@ -157,6 +175,16 @@ def sales(request):
             sessions=Count("id"),
         )
     }
+    counter_days = {
+        row["day"]: row
+        for row in counter_sales.annotate(day=TruncDate("settled"))
+        .values("day")
+        .annotate(
+            revenue=_money(Sum("amount_collected")),
+            cash=_money(Sum("amount_collected", filter=Q(payment_method="cash"))),
+            online=_money(Sum("amount_collected", filter=Q(payment_method__in=ONLINE_METHODS))),
+        )
+    }
     entry_days = {
         row["day"]: row
         for row in registrations.annotate(day=TruncDate("settled"))
@@ -173,16 +201,18 @@ def sales(request):
     while cursor <= end:
         b = booking_days.get(cursor)
         e = entry_days.get(cursor)
-        revenue = (b["revenue"] if b else Decimal("0")) + (e["revenue"] if e else Decimal("0"))
+        c = counter_days.get(cursor)
+        parts = [p for p in (b, e, c) if p]
         by_day.append({
             "date": str(cursor),
             "label": cursor.strftime("%d %b"),
             "weekday": cursor.strftime("%a"),
-            "revenue": float(revenue),
-            "cash": float((b["cash"] if b else 0) + (e["cash"] if e else 0)),
-            "online": float((b["online"] if b else 0) + (e["online"] if e else 0)),
+            "revenue": float(sum(p["revenue"] for p in parts)),
+            "cash": float(sum(p["cash"] for p in parts)),
+            "online": float(sum(p["online"] for p in parts)),
             "sessions": b["sessions"] if b else 0,
             "entry_fees": float(e["revenue"]) if e else 0.0,
+            "counter_sales": float(c["revenue"]) if c else 0.0,
         })
         cursor += timedelta(days=1)
 
@@ -200,6 +230,29 @@ def sales(request):
             minutes=Sum("duration_minutes"),
         ).order_by("-revenue")
     ]
+
+    # ---- what sold off the shelf ----
+    # Counted from the bill lines themselves, so it covers items on a session
+    # bill and standalone counter sales alike. This overlaps the revenue totals
+    # above by design: it answers "what moved", not "what came in".
+    sold = BillItem.objects.filter(
+        Q(booking__in=bookings) | Q(sale__in=counter_sales)
+    ).select_related("product", "product__category")
+
+    by_product = [
+        {
+            "product": row["name"],
+            "category": row["product__category__name"],
+            "kind": row["kind"],
+            "units": row["units"],
+            "revenue": float(row["revenue"]),
+        }
+        for row in sold.values("name", "product__category__name", "kind")
+        .annotate(units=Sum("quantity"), revenue=_money(Sum("line_total")))
+        .order_by("-revenue")[:25]
+    ]
+    items_total = sold.aggregate(t=_money(Sum("line_total")))["t"]
+    units_sold = sold.aggregate(n=Sum("quantity"))["n"] or 0
 
     # ---- money still owed, so the owner can chase it ----
     outstanding_qs = (
@@ -224,6 +277,9 @@ def sales(request):
             "revenue": float(grand_total),
             "bookings_revenue": float(booking_total),
             "entry_fees_revenue": float(entry_total),
+            "counter_sales_revenue": float(counter_total),
+            "items_total": float(items_total),
+            "units_sold": units_sold,
             "cash": float(cash_total),
             "online": float(online_total),
             "unrecorded": float(unrecorded_total),
@@ -237,6 +293,7 @@ def sales(request):
         "by_method": by_method,
         "by_day": by_day,
         "by_station_type": by_station_type,
+        "by_product": by_product,
         "busiest_day": busiest,
         "outstanding_bookings": [
             {
@@ -261,7 +318,11 @@ def sales_transactions(request):
     bookings = _settled_bookings(begin, finish).select_related("station_type")
     if method:
         bookings = bookings.filter(payment_method=method)
-    for b in bookings:
+    for b in bookings.prefetch_related("items"):
+        detail = f"{b.station_type.name}" + (f" x {b.seats}" if b.seats > 1 else "")
+        item_count = sum(i.quantity for i in b.items.all())
+        if item_count:
+            detail += f" + {item_count} item{'s' if item_count > 1 else ''}"
         rows.append({
             "kind": "booking",
             "id": b.id,
@@ -269,10 +330,28 @@ def sales_transactions(request):
             "settled_at": b.settled_at,
             "customer": b.full_name,
             "phone": b.phone,
-            "detail": f"{b.station_type.name}" + (f" x {b.seats}" if b.seats > 1 else ""),
+            "detail": detail,
             "amount": float(b.amount_collected),
             "method": b.payment_method or "",
             "method_label": METHOD_LABELS.get(b.payment_method or "", "Unrecorded"),
+        })
+
+    counter_sales = _paid_counter_sales(begin, finish).prefetch_related("items")
+    if method:
+        counter_sales = counter_sales.filter(payment_method=method)
+    for s in counter_sales:
+        names = ", ".join(f"{i.quantity}x {i.name}" for i in s.items.all()[:3])
+        rows.append({
+            "kind": "counter_sale",
+            "id": s.id,
+            "reference": s.code,
+            "settled_at": s.settled_at,
+            "customer": s.full_name or "Walk-in",
+            "phone": s.phone,
+            "detail": names or "Counter sale",
+            "amount": float(s.amount_collected),
+            "method": s.payment_method or "",
+            "method_label": METHOD_LABELS.get(s.payment_method or "", "Unrecorded"),
         })
 
     registrations = _paid_registrations(begin, finish)

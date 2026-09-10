@@ -73,6 +73,14 @@ so it is safe to re-run.
   close out a session or check someone in without leaving the screen
 - **Stations** — add platforms (Gaming PC, PS5, and whatever comes next) and
   individual stations. New hardware immediately increases public booking capacity.
+- **Shop items** — create snacks, drinks and rentable kit (extra controllers,
+  racing and flight sim rigs, VR headsets), set prices and stock, and adjust
+  stock with a reason so every count can be explained. Low-stock warnings, and a
+  live count of what is out on the floor right now.
+- **Bill** — put shop items on a session. Hourly add-ons scale with the session
+  length; the close-out screen bills station time plus items as one total.
+- **Counter sale** — ring up a walk-in who only wants a drink. Lands in the
+  sales report next to sessions.
 - **Pricing** — per-platform plans with badges, happy-hour windows and struck-through prices
 - **Tournaments & registrations** — create events, approve teams, mark entry fees
   paid, and clone a weekly event forward one week at a time
@@ -96,6 +104,11 @@ so nothing else needs changing.
 **Adding a whole new platform** (racing rigs, VR, a console you don't have yet):
 Admin → Stations → *Add platform*, then add its stations and at least one
 pricing plan. It appears on the public site as its own bookable category.
+
+**Adding snacks, drinks or kit.** Admin -> Shop items -> *Add item*. Pick
+**Consumable** for anything that gets eaten or drunk, **Rental** for kit that
+comes back. Rentals can be charged flat or per hour of the session. Everything
+you add appears immediately on the bill screen and the counter-sale screen.
 
 **Weekly tournaments.** Mark an event *Runs every week*, then use *Clone +1 week*
 to create next week's edition as a draft. Fill in the prize pool, flip it to
@@ -168,10 +181,16 @@ GET   /api/admin/sales/                  ?preset=today|yesterday|7d|30d|month|
 GET   /api/admin/sales/transactions/     same range params, plus ?method=
 CRUD  /api/admin/{bookings,stations,station-types,pricing-plans,games,customers,
                   tournaments,registrations,gallery,testimonials,faqs,
-                  business-hours,closures,messages}/
+                  business-hours,closures,messages,
+                  products,product-categories,bill-items,counter-sales}/
 GET   /api/admin/site-settings/     PATCH to edit (multipart for images)
 POST  /api/admin/bookings/<id>/{confirm,check_in,complete,cancel,no_show}/
 POST  /api/admin/bookings/<id>/record_payment/    settle an unpaid balance
+GET   /api/admin/shop/summary/                   menu + low stock + kit out now
+POST  /api/admin/shop/quick-sale/                ring up a walk-in in one call
+POST  /api/admin/products/<id>/adjust_stock/     restock / correct / write off
+GET   /api/admin/products/<id>/movements/        stock history
+POST  /api/admin/bill-items/<id>/mark_returned/  hand a rental back early
 POST  /api/admin/stations/<id>/set_status/
 POST  /api/admin/tournaments/<id>/duplicate/
 POST  /api/admin/registrations/<id>/set_status/
@@ -211,6 +230,19 @@ Anything scripting this endpoint needs updating.
   (`{customer_code, full_name, bookings: [...]}`) — a bare customer code lists
   everything they have booked. Cancelling still needs a full booking code; a
   customer code is refused rather than guessing which booking was meant.
+- **Consumables and rentals track stock differently** (`apps/shop/models.py`).
+  A consumable decrements `stock_quantity` on sale and never comes back. A
+  rental leaves `stock_quantity` alone — it is the number owned — and
+  availability is `stock_quantity` minus the units on open bill lines
+  (`returned_at is None`). Closing, cancelling or no-showing a booking calls
+  `Booking.release_rentals()`, so kit returns to the pool without anyone
+  remembering to do it.
+- **Bill lines snapshot the name and price** at the time of sale, so changing a
+  product's price later does not rewrite old bills.
+- **`Booking.amount_due` is still only the station charge.** The bill total is
+  `total_due` (`amount_due + items_total`); the close-out screen defaults to
+  that. Anything reading `amount_due` alone will undercount a session with
+  items on it.
 - `apps/bookings/models.py` still defines `make_booking_code()`. It is dead
   code kept only because migration `0001` references it by name — deleting it
   breaks the migration graph.

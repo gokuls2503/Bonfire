@@ -13,6 +13,7 @@ from django.utils import timezone
 from apps.bookings.models import Booking, BusinessHours
 from apps.catalog.models import Game, PricingPlan, Station, StationType
 from apps.content.models import FAQ, SiteSettings, Testimonial
+from apps.shop.models import Product, ProductCategory
 from apps.tournaments.models import Tournament, TournamentRegistration
 
 PC_SPECS = (
@@ -38,6 +39,7 @@ class Command(BaseCommand):
         self._faqs()
         self._testimonials()
         self._tournaments(pc, ps5)
+        self._shop()
         if options["demo"]:
             self._demo_data(pc, ps5)
         self.stdout.write(self.style.SUCCESS("Bonfire seed complete."))
@@ -314,6 +316,51 @@ class Command(BaseCommand):
                 },
             )
         self.stdout.write(f"  tournaments: {Tournament.objects.count()}")
+
+    def _shop(self):
+        """Starter menu and add-ons. Prices and stock are the owner's to edit."""
+        categories = {
+            "beverages": ("Beverages", "flame", 1),
+            "snacks": ("Snacks", "star", 2),
+            "addons": ("Add-ons & kit", "gamepad", 3),
+        }
+        made = {}
+        for key, (name, icon, order) in categories.items():
+            made[key], _ = ProductCategory.objects.get_or_create(
+                name=name, defaults={"icon": icon, "sort_order": order},
+            )
+
+        items = [
+            # (category, name, kind, pricing_mode, price, stock, low_threshold)
+            ("beverages", "Water 1L", "consumable", "flat", "20", 48, 12),
+            ("beverages", "Pepsi 500ml", "consumable", "flat", "40", 36, 12),
+            ("beverages", "Sting 250ml", "consumable", "flat", "40", 36, 12),
+            ("beverages", "Red Bull 250ml", "consumable", "flat", "125", 24, 6),
+            ("beverages", "Iced tea", "consumable", "flat", "50", 24, 6),
+            ("snacks", "Lays (medium)", "consumable", "flat", "30", 40, 10),
+            ("snacks", "Kurkure", "consumable", "flat", "20", 40, 10),
+            ("snacks", "Snickers", "consumable", "flat", "45", 30, 8),
+            ("snacks", "Instant noodles", "consumable", "flat", "60", 24, 6),
+            ("snacks", "Samosa (2 pc)", "consumable", "flat", "40", 20, 5),
+            ("addons", "Extra controller", "rental", "flat", "50", 6, 2),
+            ("addons", "Racing sim rig", "rental", "hourly", "150", 1, 1),
+            ("addons", "Flight sim setup", "rental", "hourly", "150", 1, 1),
+            ("addons", "VR headset", "rental", "hourly", "200", 1, 1),
+            ("addons", "Premium headset", "rental", "flat", "30", 4, 1),
+        ]
+        for order, (cat, name, kind, mode, price, stock, low) in enumerate(items, start=1):
+            Product.objects.get_or_create(
+                name=name,
+                category=made[cat],
+                defaults={
+                    "kind": kind, "pricing_mode": mode, "price": Decimal(price),
+                    "stock_quantity": stock, "low_stock_threshold": low, "sort_order": order,
+                },
+            )
+        self.stdout.write(
+            f"  shop: {ProductCategory.objects.count()} categories, "
+            f"{Product.objects.count()} products"
+        )
 
     def _demo_data(self, pc, ps5):
         if Booking.objects.exists():

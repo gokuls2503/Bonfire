@@ -279,6 +279,13 @@ export default function Sales() {
                     <td><strong>{rupees(t.entry_fees_revenue)}</strong></td>
                   </tr>
                 )}
+                {t.counter_sales_revenue > 0 && (
+                  <tr>
+                    <td><strong>Counter sales</strong></td>
+                    <td colSpan={2} className="muted small">walk-in shop</td>
+                    <td><strong>{rupees(t.counter_sales_revenue)}</strong></td>
+                  </tr>
+                )}
               </tbody>
             </table>
           )}
@@ -321,6 +328,44 @@ export default function Sales() {
           )}
         </section>
       </div>
+
+      {data.by_product?.length > 0 && (
+        <section className="card card--pad0" style={{ marginTop: '1rem' }}>
+          <header className="card__head">
+            <h3>What sold</h3>
+            <span className="spacer" />
+            <span className="small muted">
+              {t.units_sold} unit{t.units_sold === 1 ? '' : 's'} · {rupees(t.items_total)}
+            </span>
+          </header>
+          <div className="table-wrap">
+            <table className="data">
+              <thead>
+                <tr><th>Item</th><th>Category</th><th>Type</th><th>Units</th><th>Revenue</th></tr>
+              </thead>
+              <tbody>
+                {data.by_product.map((row) => (
+                  <tr key={row.product}>
+                    <td><strong>{row.product}</strong></td>
+                    <td className="small muted">{row.category}</td>
+                    <td>
+                      <Pill tone={row.kind === 'rental' ? 'info' : ''}>
+                        {row.kind === 'rental' ? 'Rental' : 'Consumable'}
+                      </Pill>
+                    </td>
+                    <td>{row.units}</td>
+                    <td><strong>{rupees(row.revenue)}</strong></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="small muted" style={{ padding: '0.85rem 1.15rem', margin: 0 }}>
+            Counts every line on a session bill and every counter sale. This overlaps
+            the totals above — it answers what moved off the shelf, not what came in.
+          </p>
+        </section>
+      )}
 
       <section className="card card--pad0" style={{ marginTop: '1rem' }}>
         <header className="card__head">

@@ -155,7 +155,8 @@ class BookingViewSet(StaffViewSet):
         is required unless the session is explicitly waived or left unpaid.
         """
         booking = self.get_object()
-        collected = request.data.get("amount_collected", booking.amount_due)
+        # Default to the whole bill — station time plus anything added to it.
+        collected = request.data.get("amount_collected", booking.total_due)
         payment_status = request.data.get("payment_status", Booking.PaymentStatus.PAID)
         method = request.data.get("payment_method", "")
 
@@ -172,6 +173,8 @@ class BookingViewSet(StaffViewSet):
 
         if booking.station_id:
             Station.objects.filter(pk=booking.station_id).update(status=Station.Status.AVAILABLE)
+        # Rented kit goes back on the shelf the moment the bill is closed.
+        booking.release_rentals()
 
         return self._transition(
             booking,
@@ -205,11 +208,14 @@ class BookingViewSet(StaffViewSet):
         booking = self.get_object()
         if booking.station_id:
             Station.objects.filter(pk=booking.station_id).update(status=Station.Status.AVAILABLE)
+        booking.release_rentals()
         return self._transition(booking, Booking.Status.CANCELLED)
 
     @action(detail=True, methods=["post"])
     def no_show(self, request, pk=None):
-        return self._transition(self.get_object(), Booking.Status.NO_SHOW)
+        booking = self.get_object()
+        booking.release_rentals()
+        return self._transition(booking, Booking.Status.NO_SHOW)
 
 
 class TournamentViewSet(StaffViewSet):

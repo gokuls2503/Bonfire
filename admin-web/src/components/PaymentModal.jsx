@@ -24,7 +24,11 @@ const METHODS = [
  * balance without touching the booking's status).
  */
 export default function PaymentModal({ booking, mode = 'complete', onDone, onClose }) {
-  const due = Number(booking.amount_due || 0)
+  const station = Number(booking.amount_due || 0)
+  const items = Number(booking.items_total || 0)
+  // total_due is served by the API; fall back for callers that build a booking
+  // object by hand (the Sales page's outstanding list).
+  const due = Number(booking.total_due ?? station + items)
   const [method, setMethod] = useState('cash')
   const [amount, setAmount] = useState(due.toFixed(2))
   const [outcome, setOutcome] = useState('paid')
@@ -90,6 +94,11 @@ export default function PaymentModal({ booking, mode = 'complete', onDone, onClo
           <div>
             <span className="small muted">Amount due</span>
             <strong className="pay-summary__due">{rupees(due)}</strong>
+            {items > 0 && (
+              <span className="small muted">
+                {rupees(station)} station + {rupees(items)} items
+              </span>
+            )}
           </div>
         </div>
 

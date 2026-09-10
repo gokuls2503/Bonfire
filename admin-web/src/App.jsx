@@ -9,6 +9,8 @@ import Bookings from './pages/Bookings'
 import Sales from './pages/Sales'
 import Floor from './pages/Floor'
 import Stations from './pages/Stations'
+import Products from './pages/Products'
+import CounterSale from './pages/CounterSale'
 import Pricing from './pages/Pricing'
 import Games from './pages/Games'
 import Customers from './pages/Customers'
@@ -47,6 +49,8 @@ function Console() {
         <Route path="/sales" element={<Sales />} />
         <Route path="/floor" element={<Floor />} />
         <Route path="/stations" element={<Stations />} />
+        <Route path="/products" element={<Products />} />
+        <Route path="/counter-sale" element={<CounterSale />} />
         <Route path="/pricing" element={<Pricing />} />
         <Route path="/games" element={<Games />} />
         <Route path="/customers" element={<Customers />} />

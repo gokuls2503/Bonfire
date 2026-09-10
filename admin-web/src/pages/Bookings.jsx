@@ -8,6 +8,7 @@ import {
   STATUS_TONE, Textarea, useToast,
 } from '../components/ui'
 import PaymentModal from '../components/PaymentModal'
+import BillModal from '../components/BillModal'
 import Icon from '../components/Icon'
 
 const STATUSES = [
@@ -204,6 +205,7 @@ export default function Bookings() {
   const [deleting, setDeleting] = useState(null)
   const [paying, setPaying] = useState(null)
   const [settling, setSettling] = useState(null)
+  const [billing, setBilling] = useState(null)
   const [busy, setBusy] = useState(null)
   const toast = useToast()
 
@@ -361,6 +363,11 @@ export default function Bookings() {
                         <button className="btn btn--sm"
                           onClick={() => setSettling(b)}>Take payment</button>
                       )}
+                      {!['cancelled', 'no_show'].includes(b.status) && (
+                        <button className="btn btn--ghost btn--sm" onClick={() => setBilling(b)}>
+                          Bill{Number(b.items_total) > 0 ? ` (${rupees(b.items_total)})` : ''}
+                        </button>
+                      )}
                       <button className="btn btn--ghost btn--sm" onClick={() => setEditing(b)}>Edit</button>
                       {!['completed', 'cancelled'].includes(b.status) && (
                         <button className="btn btn--ghost btn--sm" disabled={busy === `${b.id}-cancel`}
@@ -394,6 +401,14 @@ export default function Bookings() {
           onConfirm={remove}
           onClose={() => setDeleting(null)}
           busy={busy === 'delete'}
+        />
+      )}
+
+      {billing && (
+        <BillModal
+          booking={billing}
+          onClose={() => setBilling(null)}
+          onChanged={refresh}
         />
       )}
 
