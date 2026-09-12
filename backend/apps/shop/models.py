@@ -155,6 +155,7 @@ class CounterSale(TimeStamped):
         UPI = "upi", "UPI"
         CARD = "card", "Card"
         OTHER = "other", "Other"
+        SPLIT = "split", "Split"
 
     code = models.CharField(max_length=12, unique=True, default=make_sale_code, editable=False)
     customer = models.ForeignKey(
@@ -168,6 +169,8 @@ class CounterSale(TimeStamped):
     )
     payment_method = models.CharField(max_length=10, choices=PaymentMethod.choices, blank=True)
     amount_collected = models.DecimalField(**MONEY, default=0)
+    discount_amount = models.DecimalField(**MONEY, default=0)
+    discount_reason = models.CharField(max_length=140, blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)
     staff_notes = models.TextField(blank=True)
 
@@ -182,8 +185,17 @@ class CounterSale(TimeStamped):
         return sum((i.line_total for i in self.items.all()), Decimal("0.00"))
 
     @property
+    def total_due(self):
+        """What the customer actually pays, after any discount."""
+        return max(self.items_total - self.discount_amount, Decimal("0.00"))
+
+    @property
     def settled_at(self):
         return self.completed_at or self.created_at
+
+    def record_payments(self, tenders, discount=None, reason=None):
+        """Single writer for how a sale was paid. See Booking.record_payments."""
+        return _record_payments(self, tenders, discount=discount, reason=reason)
 
     def save(self, *args, **kwargs):
         if self.customer is None and self.phone:
@@ -330,3 +342,101 @@ class StockMovement(TimeStamped):
 
     def __str__(self):
         return f"{self.product.name} {self.change:+d} ({self.get_reason_display()})"
+
+
+class Payment(TimeStamped):
+    """One tender against a bill. A split payment is simply two of these.
+
+    `Booking.payment_method` and `amount_collected` remain as denormalised
+    summaries for display, but these rows are the detail the sales report
+    attributes cash and online revenue from.
+    """
+
+    class Method(models.TextChoices):
+        CASH = "cash", "Cash"
+        UPI = "upi", "UPI"
+        CARD = "card", "Card"
+        OTHER = "other", "Other"
+
+        @classmethod
+        def online(cls):
+            return [cls.UPI, cls.CARD, cls.OTHER]
+
+    booking = models.ForeignKey(
+        "bookings.Booking", on_delete=models.CASCADE, null=True, blank=True,
+        related_name="payments",
+    )
+    sale = models.ForeignKey(
+        CounterSale, on_delete=models.CASCADE, null=True, blank=True, related_name="payments"
+    )
+    method = models.CharField(max_length=10, choices=Method.choices)
+    amount = models.DecimalField(**MONEY)
+    settled_at = models.DateTimeField(
+        default=timezone.now, db_index=True, help_text="When the money actually moved."
+    )
+    note = models.CharField(max_length=140, blank=True)
+
+    class Meta:
+        ordering = ("settled_at", "id")
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    Q(booking__isnull=False, sale__isnull=True)
+                    | Q(booking__isnull=True, sale__isnull=False)
+                ),
+                name="payment_belongs_to_exactly_one_bill",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.get_method_display()} {self.amount}"
+
+    def clean(self):
+        if bool(self.booking_id) == bool(self.sale_id):
+            raise ValidationError("A payment must belong to one booking or one counter sale.")
+        if self.amount is not None and self.amount <= 0:
+            raise ValidationError({"amount": "A payment must be for more than zero."})
+
+
+def _record_payments(bill, tenders, discount=None, reason=None):
+    """Replace a bill's payments, keeping its summary fields in step.
+
+    `tenders` is [(method, amount), ...]. One tender records that method; more
+    than one records SPLIT. Writing the rows and the summary together is what
+    keeps `amount_collected` from drifting away from the payment detail.
+    """
+    cleaned = [
+        (method, Decimal(str(amount)))
+        for method, amount in tenders
+        if Decimal(str(amount)) > 0
+    ]
+
+    with transaction.atomic():
+        if discount is not None:
+            bill.discount_amount = Decimal(str(discount))
+            bill.discount_reason = reason or ""
+
+        bill.payments.all().delete()
+        now = timezone.now()
+        for method, amount in cleaned:
+            Payment.objects.create(
+                **{"booking" if bill._meta.model_name == "booking" else "sale": bill},
+                method=method,
+                amount=amount,
+                settled_at=now,
+            )
+
+        bill.amount_collected = sum((a for _, a in cleaned), Decimal("0.00"))
+        if len(cleaned) > 1:
+            bill.payment_method = "split"
+        elif cleaned:
+            bill.payment_method = cleaned[0][0]
+        else:
+            bill.payment_method = ""
+
+        fields = ["amount_collected", "payment_method", "updated_at"]
+        if discount is not None:
+            fields += ["discount_amount", "discount_reason"]
+        bill.save(update_fields=fields)
+
+    return bill

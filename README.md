@@ -64,6 +64,9 @@ so it is safe to re-run.
 - **Bookings** — filter by date/status/search, create walk-ins, and the full
   lifecycle: confirm → check in → close out (which frees the station and records
   how the money was taken), plus cancel and no-show
+- **Checkout** — take a bill as cash, UPI, or **split across both**, and apply a
+  manual **discount** (₹ or %) that requires a reason. Change-due helper for
+  cash. A split must balance the bill exactly before it can be taken.
 - **Sales** — daily takings split into **cash and online**, over today,
   yesterday, 7/30 days, this or last month, or any custom range. Stacked daily
   chart, payment mix, revenue per platform, tournament entry fees counted
@@ -186,6 +189,11 @@ CRUD  /api/admin/{bookings,stations,station-types,pricing-plans,games,customers,
 GET   /api/admin/site-settings/     PATCH to edit (multipart for images)
 POST  /api/admin/bookings/<id>/{confirm,check_in,complete,cancel,no_show}/
 POST  /api/admin/bookings/<id>/record_payment/    settle an unpaid balance
+
+  Both accept either `payment_method` for a single tender, or
+  `payments: [{method, amount}, ...]` for a split that must sum to the bill.
+  Both accept `discount_amount` (or `discount_percent`) with a
+  `discount_reason`, which is required whenever a discount is applied.
 GET   /api/admin/shop/summary/                   menu + low stock + kit out now
 POST  /api/admin/shop/quick-sale/                ring up a walk-in in one call
 POST  /api/admin/products/<id>/adjust_stock/     restock / correct / write off
@@ -239,9 +247,24 @@ Anything scripting this endpoint needs updating.
   remembering to do it.
 - **Bill lines snapshot the name and price** at the time of sale, so changing a
   product's price later does not rewrite old bills.
+- **Payments are rows, not a field.** `shop.Payment` holds one line per tender,
+  which is how a split booking puts its cash half in cash and its UPI half in
+  online. `amount_collected` and `payment_method` remain on the bill as
+  denormalised summaries, but only `record_payments()` writes them, together
+  with the rows, so they cannot drift. `payment_method` reads `split` when
+  there is more than one tender — that is a summary label and must never be
+  stored on a `Payment`.
+- **The sales report falls back when a bill has no payment rows**
+  (`_tender_rows` in `apps/api/sales.py`). That happens for anything marked paid
+  through `/django-admin/`, and for split bills whose detail a down-migration
+  destroyed. An unknown method is counted as unrecorded rather than crashing the
+  report, and surfaces in the "taken without a recorded method" flag.
+- **Every gap between the bill and what was tendered is either a recorded
+  discount or a recorded debt.** Under-typing the amount to collect less is not
+  possible: use a discount (which needs a reason) or leave the session unpaid.
 - **`Booking.amount_due` is still only the station charge.** The bill total is
-  `total_due` (`amount_due + items_total`); the close-out screen defaults to
-  that. Anything reading `amount_due` alone will undercount a session with
+  `total_due` (`amount_due + items_total − discount_amount`, floored at zero);
+  the close-out screen defaults to that. Anything reading `amount_due` alone will undercount a session with
   items on it.
 - `apps/bookings/models.py` still defines `make_booking_code()`. It is dead
   code kept only because migration `0001` references it by name — deleting it

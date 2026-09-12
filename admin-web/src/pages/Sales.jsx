@@ -106,7 +106,8 @@ export default function Sales() {
         header.join(','),
         ...res.transactions.map((t) => [
           formatDay(t.settled_at), formatTime(t.settled_at), t.reference,
-          t.kind === 'booking' ? 'Session' : 'Entry fee',
+          { booking: 'Session', entry_fee: 'Entry fee', counter_sale: 'Counter sale' }[t.kind]
+            || t.kind,
           t.customer, t.phone, t.detail, t.method_label, t.amount,
         ].map(escape).join(',')),
         ['', '', '', '', '', '', '', 'TOTAL', res.total].map(escape).join(','),
@@ -167,6 +168,11 @@ export default function Sales() {
           sub={`${t.online_share}% — UPI, card`} />
         <Stat icon="calendar" label="Sessions" value={t.sessions}
           sub={`${rupees(t.avg_per_session)} average`} />
+        {t.discounts > 0 && (
+          <Stat icon="star" label="Discounts given" value={rupees(t.discounts)}
+            sub={`${data.discounts_given?.length || 0} bill${
+              data.discounts_given?.length === 1 ? '' : 's'}`} />
+        )}
       </div>
 
       {(t.outstanding > 0 || t.unrecorded > 0) && (
@@ -328,6 +334,33 @@ export default function Sales() {
           )}
         </section>
       </div>
+
+      {data.discounts_given?.length > 0 && (
+        <section className="card card--pad0" style={{ marginTop: '1rem' }}>
+          <header className="card__head">
+            <h3>Discounts given</h3>
+            <span className="spacer" />
+            <strong className="sales-owed">{rupees(t.discounts)}</strong>
+          </header>
+          <div className="table-wrap">
+            <table className="data">
+              <thead>
+                <tr><th>Bill</th><th>Customer</th><th>Reason</th><th>Amount</th></tr>
+              </thead>
+              <tbody>
+                {data.discounts_given.map((d) => (
+                  <tr key={`${d.reference}-${d.settled_at}`}>
+                    <td className="mono">{d.reference}</td>
+                    <td>{d.customer}</td>
+                    <td className="small muted">{d.reason || '—'}</td>
+                    <td><strong style={{ color: 'var(--warn)' }}>−{rupees(d.amount)}</strong></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
 
       {data.by_product?.length > 0 && (
         <section className="card card--pad0" style={{ marginTop: '1rem' }}>

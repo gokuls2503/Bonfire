@@ -30,10 +30,11 @@ def settle(pcs, make_booking):
             seats=seats,
             status=Booking.Status.COMPLETED,
             payment_status=Booking.PaymentStatus.PAID,
-            payment_method=method,
             amount_due=Decimal(str(amount)),
-            amount_collected=Decimal(str(amount)),
         )
+        # Go through the real writer so the suite exercises Payment rows, not
+        # just the summary fields.
+        booking.record_payments([(method, Decimal(str(amount)))])
         Booking.objects.filter(pk=booking.pk).update(completed_at=when)
         booking.refresh_from_db()
         return booking

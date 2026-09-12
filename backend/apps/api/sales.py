@@ -4,6 +4,7 @@ Revenue is recognised when the money changed hands (`completed_at`), falling
 back to `start_at` for rows completed before that field was recorded. Booking
 revenue and tournament entry fees are reported separately and combined.
 """
+from collections import defaultdict
 from datetime import datetime, timedelta
 from decimal import Decimal
 
@@ -14,7 +15,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 
 from apps.bookings.models import Booking
-from apps.shop.models import BillItem, CounterSale
+from apps.shop.models import BillItem, CounterSale, Payment
 from apps.tournaments.models import TournamentRegistration
 
 from .permissions import IsStaffUser
@@ -106,6 +107,45 @@ def _paid_counter_sales(begin, finish):
     )
 
 
+def _tender_rows(bookings, counter_sales):
+    """Every tender in range as (day, method, amount).
+
+    Payment rows are the detail — a split booking contributes its cash half to
+    cash and its UPI half to online. A settled bill with no payment rows falls
+    back to its own summary method: that happens for anything marked paid
+    through /django-admin/, and dropping those would quietly lose real takings.
+
+    The day comes from the *bill*, not the payment, so the daily series always
+    adds up to the same total as the headline figure.
+    """
+    rows = []
+    by_booking = defaultdict(list)
+    by_sale = defaultdict(list)
+
+    payments = Payment.objects.filter(
+        Q(booking__in=bookings) | Q(sale__in=counter_sales)
+    )
+    for payment in payments:
+        if payment.booking_id:
+            by_booking[payment.booking_id].append(payment)
+        else:
+            by_sale[payment.sale_id].append(payment)
+
+    def _collect(bills, bucket):
+        for bill in bills:
+            day = timezone.localtime(bill.settled).date()
+            tendered = bucket.get(bill.id)
+            if tendered:
+                for payment in tendered:
+                    rows.append((day, payment.method, payment.amount))
+            elif bill.amount_collected:
+                rows.append((day, bill.payment_method or "", bill.amount_collected))
+
+    _collect(bookings, by_booking)
+    _collect(counter_sales, by_sale)
+    return rows
+
+
 @api_view(["GET"])
 @permission_classes([IsStaffUser])
 def sales(request):
@@ -123,24 +163,28 @@ def sales(request):
     counter_total = counter_sales.aggregate(t=_money(Sum("amount_collected")))["t"]
     sessions = bookings.count()
 
-    # ---- split by method: bookings, entry fees and counter sales combined ----
+    # ---- split by method, from the individual tenders ----
+    tenders = _tender_rows(bookings, counter_sales)
     per_method = {key: {"amount": Decimal("0"), "count": 0} for key in METHOD_LABELS}
-    for row in bookings.values("payment_method").annotate(
-        amount=_money(Sum("amount_collected")), count=Count("id")
-    ):
-        bucket = per_method[row["payment_method"] or ""]
-        bucket["amount"] += row["amount"]
-        bucket["count"] += row["count"]
-    for row in counter_sales.values("payment_method").annotate(
-        amount=_money(Sum("amount_collected")), count=Count("id")
-    ):
-        bucket = per_method[row["payment_method"] or ""]
-        bucket["amount"] += row["amount"]
-        bucket["count"] += row["count"]
+
+    def _bucket(method):
+        """Never let an unexpected method take the whole report down.
+
+        "split" is a summary label rather than a tender, so it only reaches here
+        when a bill's payment detail is missing — after a down-migration, say.
+        Counting it as unrecorded is honest, and the report still renders.
+        """
+        return per_method[method if method in per_method else ""]
+
+    for _, method, amount in tenders:
+        bucket = _bucket(method)
+        bucket["amount"] += amount
+        bucket["count"] += 1
+    # Entry fees are a single small tender and stay on their own field.
     for row in registrations.values("payment_method").annotate(
         amount=_money(Sum("amount_paid")), count=Count("id")
     ):
-        bucket = per_method[row["payment_method"] or ""]
+        bucket = _bucket(row["payment_method"])
         bucket["amount"] += row["amount"]
         bucket["count"] += row["count"]
 
@@ -164,26 +208,24 @@ def sales(request):
     ]
 
     # ---- day by day ----
+    tender_days = defaultdict(lambda: {"cash": Decimal("0"), "online": Decimal("0")})
+    for day, method, amount in tenders:
+        if method == "cash":
+            tender_days[day]["cash"] += amount
+        elif method in ONLINE_METHODS:
+            tender_days[day]["online"] += amount
+
     booking_days = {
         row["day"]: row
         for row in bookings.annotate(day=TruncDate("settled"))
         .values("day")
-        .annotate(
-            revenue=_money(Sum("amount_collected")),
-            cash=_money(Sum("amount_collected", filter=Q(payment_method="cash"))),
-            online=_money(Sum("amount_collected", filter=Q(payment_method__in=ONLINE_METHODS))),
-            sessions=Count("id"),
-        )
+        .annotate(revenue=_money(Sum("amount_collected")), sessions=Count("id"))
     }
     counter_days = {
         row["day"]: row
         for row in counter_sales.annotate(day=TruncDate("settled"))
         .values("day")
-        .annotate(
-            revenue=_money(Sum("amount_collected")),
-            cash=_money(Sum("amount_collected", filter=Q(payment_method="cash"))),
-            online=_money(Sum("amount_collected", filter=Q(payment_method__in=ONLINE_METHODS))),
-        )
+        .annotate(revenue=_money(Sum("amount_collected")))
     }
     entry_days = {
         row["day"]: row
@@ -203,13 +245,15 @@ def sales(request):
         e = entry_days.get(cursor)
         c = counter_days.get(cursor)
         parts = [p for p in (b, e, c) if p]
+        tendered = tender_days.get(cursor, {"cash": Decimal("0"), "online": Decimal("0")})
         by_day.append({
             "date": str(cursor),
             "label": cursor.strftime("%d %b"),
             "weekday": cursor.strftime("%a"),
             "revenue": float(sum(p["revenue"] for p in parts)),
-            "cash": float(sum(p["cash"] for p in parts)),
-            "online": float(sum(p["online"] for p in parts)),
+            # Entry fees keep their own field, so add them to the right bucket.
+            "cash": float(tendered["cash"] + (e["cash"] if e else Decimal("0"))),
+            "online": float(tendered["online"] + (e["online"] if e else Decimal("0"))),
             "sessions": b["sessions"] if b else 0,
             "entry_fees": float(e["revenue"]) if e else 0.0,
             "counter_sales": float(c["revenue"]) if c else 0.0,
@@ -254,6 +298,31 @@ def sales(request):
     items_total = sold.aggregate(t=_money(Sum("line_total")))["t"]
     units_sold = sold.aggregate(n=Sum("quantity"))["n"] or 0
 
+    # ---- what was given away ----
+    discounts_total = (
+        bookings.aggregate(t=_money(Sum("discount_amount")))["t"]
+        + counter_sales.aggregate(t=_money(Sum("discount_amount")))["t"]
+    )
+    discounted = [
+        {
+            "reference": b.code,
+            "customer": b.full_name,
+            "amount": float(b.discount_amount),
+            "reason": b.discount_reason,
+            "settled_at": b.settled_at,
+        }
+        for b in bookings.filter(discount_amount__gt=0).order_by("-settled")[:25]
+    ] + [
+        {
+            "reference": s.code,
+            "customer": s.full_name or "Walk-in",
+            "amount": float(s.discount_amount),
+            "reason": s.discount_reason,
+            "settled_at": s.settled_at,
+        }
+        for s in counter_sales.filter(discount_amount__gt=0).order_by("-settled")[:25]
+    ]
+
     # ---- money still owed, so the owner can chase it ----
     outstanding_qs = (
         Booking.objects.filter(
@@ -280,6 +349,7 @@ def sales(request):
             "counter_sales_revenue": float(counter_total),
             "items_total": float(items_total),
             "units_sold": units_sold,
+            "discounts": float(discounts_total),
             "cash": float(cash_total),
             "online": float(online_total),
             "unrecorded": float(unrecorded_total),
@@ -294,6 +364,7 @@ def sales(request):
         "by_day": by_day,
         "by_station_type": by_station_type,
         "by_product": by_product,
+        "discounts_given": sorted(discounted, key=lambda d: d["settled_at"], reverse=True),
         "busiest_day": busiest,
         "outstanding_bookings": [
             {

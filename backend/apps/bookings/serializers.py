@@ -31,7 +31,9 @@ class BookingSerializer(serializers.ModelSerializer):
     customer_code = serializers.CharField(read_only=True)
     items_total = serializers.DecimalField(max_digits=9, decimal_places=2, read_only=True)
     total_due = serializers.DecimalField(max_digits=9, decimal_places=2, read_only=True)
+    gross_due = serializers.DecimalField(max_digits=9, decimal_places=2, read_only=True)
     items = serializers.SerializerMethodField()
+    payments = serializers.SerializerMethodField()
 
     class Meta:
         model = Booking
@@ -40,7 +42,8 @@ class BookingSerializer(serializers.ModelSerializer):
             "station_type_name", "station", "station_name", "pricing_plan", "start_at",
             "end_at", "duration_minutes", "seats", "status", "status_display",
             "payment_status", "payment_method", "amount_due", "amount_collected",
-            "items", "items_total", "total_due", "customer_code",
+            "items", "items_total", "total_due", "gross_due", "customer_code",
+            "discount_amount", "discount_reason", "payments",
             "source", "notes",
             "staff_notes", "checked_in_at", "completed_at", "created_at",
         ]
@@ -52,6 +55,11 @@ class BookingSerializer(serializers.ModelSerializer):
         from apps.shop.serializers import BillItemSerializer
 
         return BillItemSerializer(obj.items.all(), many=True).data
+
+    def get_payments(self, obj):
+        from apps.shop.serializers import PaymentSerializer
+
+        return PaymentSerializer(obj.payments.all(), many=True).data
 
     def validate(self, attrs):
         instance = Booking(**{**self._instance_data(), **attrs})

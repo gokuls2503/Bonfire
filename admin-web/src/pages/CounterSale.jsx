@@ -2,22 +2,17 @@ import { useEffect, useMemo, useState } from 'react'
 import { api } from '../lib/api'
 import { rupees, formatDateTime } from '../lib/format'
 import { Empty, Loading, PageHead, Pill, useToast } from '../components/ui'
+import { ChangeDue, DiscountBlock, TenderBlock, useCheckout } from '../components/checkout'
 import Icon from '../components/Icon'
 import '../components/bill.css'
 import '../components/payment.css'
 import './counter.css'
-
-const METHODS = [
-  { value: 'cash', label: 'Cash', icon: 'flame' },
-  { value: 'upi', label: 'UPI', icon: 'bolt' },
-]
 
 export default function CounterSale() {
   const [shop, setShop] = useState(null)
   const [cart, setCart] = useState([])
   const [category, setCategory] = useState('')
   const [search, setSearch] = useState('')
-  const [method, setMethod] = useState('cash')
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [busy, setBusy] = useState(false)
@@ -78,24 +73,29 @@ export default function CounterSale() {
   const total = cart.reduce(
     (sum, row) => sum + Number(row.product.price) * row.quantity, 0,
   )
+  const checkout = useCheckout(total)
 
-  const checkout = async () => {
+  const submitSale = async () => {
     if (!cart.length) return
     setBusy(true)
     try {
       const sale = await api.post('/admin/shop/quick-sale/', {
         full_name: name.trim(),
         phone: phone.trim(),
-        payment_method: method,
         items: cart.map((row) => ({ product: row.product.id, quantity: row.quantity })),
+        ...checkout.body(),
       })
-      toast(`${sale.code} — ${rupees(sale.items_total)} ${method === 'cash' ? 'cash' : 'UPI'}`)
+      toast(`${sale.code} — ${checkout.summary()}`)
       setCart([])
       setName('')
       setPhone('')
+      checkout.reset()
       await load()
     } catch (err) {
-      toast(err.fields?.items || err.message, 'error')
+      toast(
+        err.fields?.items || err.fields?.payments || err.fields?.discount_reason || err.message,
+        'error',
+      )
     } finally {
       setBusy(false)
     }
@@ -177,21 +177,24 @@ export default function CounterSale() {
           )}
 
           <div className="counter__total">
-            <span>Total</span>
-            <strong>{rupees(total)}</strong>
+            <span>{checkout.discount > 0 ? 'After discount' : 'Total'}</span>
+            <strong>{rupees(checkout.net)}</strong>
           </div>
+          {checkout.discount > 0 && (
+            <span className="small" style={{ color: 'var(--warn)', marginTop: '-0.5rem' }}>
+              was {rupees(total)}, less {rupees(checkout.discount)}
+            </span>
+          )}
 
-          <span className="pay-label">How was it paid?</span>
-          <div className="pay-methods">
-            {METHODS.map((m) => (
-              <button key={m.value} type="button"
-                className={`pay-method ${method === m.value ? 'is-active' : ''}`}
-                onClick={() => setMethod(m.value)}>
-                <Icon name={m.icon} size={18} />
-                <strong>{m.label}</strong>
-              </button>
-            ))}
-          </div>
+          {cart.length > 0 && (
+            <>
+              <DiscountBlock checkout={checkout} />
+              <TenderBlock checkout={checkout} compact />
+              {checkout.tender === 'cash' && checkout.net > 0 && (
+                <ChangeDue net={checkout.net} />
+              )}
+            </>
+          )}
 
           <details className="counter__who">
             <summary>Attach to a customer (optional)</summary>
@@ -209,8 +212,10 @@ export default function CounterSale() {
             </div>
           </details>
 
-          <button className="btn btn--block" disabled={busy || !cart.length} onClick={checkout}>
-            {busy ? 'Saving…' : `Take ${rupees(total)}`}
+          <button className="btn btn--block"
+            disabled={busy || !cart.length || !checkout.canTender}
+            onClick={submitSale}>
+            {busy ? 'Saving…' : `Take ${rupees(checkout.net)}`}
           </button>
         </section>
       </div>

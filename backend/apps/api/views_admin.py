@@ -31,6 +31,7 @@ from apps.tournaments.serializers import (
     TournamentRegistrationSerializer, TournamentSerializer,
 )
 
+from .checkout import resolve_discount, resolve_tenders
 from .permissions import IsStaffUser
 
 
@@ -155,21 +156,17 @@ class BookingViewSet(StaffViewSet):
         is required unless the session is explicitly waived or left unpaid.
         """
         booking = self.get_object()
-        # Default to the whole bill — station time plus anything added to it.
-        collected = request.data.get("amount_collected", booking.total_due)
         payment_status = request.data.get("payment_status", Booking.PaymentStatus.PAID)
-        method = request.data.get("payment_method", "")
 
         if payment_status == Booking.PaymentStatus.PAID:
-            if method not in dict(Booking.PaymentMethod.choices):
-                return Response(
-                    {"payment_method": "Choose how the payment was taken: cash, upi, card or other."},
-                    status=400,
-                )
+            discount, reason = resolve_discount(request.data, booking.gross_due)
+            net = max(booking.gross_due - discount, Decimal("0.00"))
+            tenders = resolve_tenders(request.data, net) if net > 0 else []
+            booking.record_payments(tenders, discount=discount, reason=reason)
         else:
-            method = ""
-            if payment_status == Booking.PaymentStatus.UNPAID:
-                collected = 0
+            # Unpaid leaves the balance on the books; waived writes it off.
+            discount, reason = resolve_discount(request.data, booking.gross_due)
+            booking.record_payments([], discount=discount, reason=reason)
 
         if booking.station_id:
             Station.objects.filter(pk=booking.station_id).update(status=Station.Status.AVAILABLE)
@@ -180,27 +177,22 @@ class BookingViewSet(StaffViewSet):
             booking,
             Booking.Status.COMPLETED,
             completed_at=timezone.now(),
-            amount_collected=Decimal(str(collected)),
             payment_status=payment_status,
-            payment_method=method,
         )
 
     @action(detail=True, methods=["post"])
     def record_payment(self, request, pk=None):
         """Settle an outstanding balance without touching the booking's status."""
         booking = self.get_object()
-        method = request.data.get("payment_method", "")
-        if method not in dict(Booking.PaymentMethod.choices):
-            return Response({"payment_method": "Choose a payment method."}, status=400)
-        collected = Decimal(str(request.data.get("amount_collected", booking.amount_due)))
+        discount, reason = resolve_discount(request.data, booking.gross_due)
+        net = max(booking.gross_due - discount, Decimal("0.00"))
+        tenders = resolve_tenders(request.data, net)
+
+        booking.record_payments(tenders, discount=discount, reason=reason)
         booking.payment_status = Booking.PaymentStatus.PAID
-        booking.payment_method = method
-        booking.amount_collected = collected
         if not booking.completed_at:
             booking.completed_at = timezone.now()
-        booking.save(update_fields=[
-            "payment_status", "payment_method", "amount_collected", "completed_at", "updated_at",
-        ])
+        booking.save(update_fields=["payment_status", "completed_at", "updated_at"])
         return Response(BookingSerializer(booking).data)
 
     @action(detail=True, methods=["post"])

@@ -332,9 +332,13 @@ export default function Bookings() {
                     <td>
                       <Pill tone={STATUS_TONE[b.status]}>{b.status_display}</Pill>
                       <div style={{ marginTop: '0.25rem' }}>
-                        <Pill tone={STATUS_TONE[b.payment_status]}>
+                        <Pill tone={
+                          b.payment_method === 'split' ? 'ember' : STATUS_TONE[b.payment_status]
+                        }>
                           {b.payment_status === 'paid' && b.payment_method
-                            ? b.payment_method === 'cash' ? 'Cash' : b.payment_method.toUpperCase()
+                            ? b.payment_method === 'cash' ? 'Cash'
+                              : b.payment_method === 'split' ? 'Split'
+                              : b.payment_method.toUpperCase()
                             : b.payment_status}
                         </Pill>
                       </div>
@@ -343,6 +347,11 @@ export default function Bookings() {
                       {rupees(b.amount_due)}
                       {Number(b.amount_collected) > 0 && (
                         <div className="small muted">got {rupees(b.amount_collected)}</div>
+                      )}
+                      {Number(b.discount_amount) > 0 && (
+                        <div className="small" style={{ color: 'var(--warn)' }}>
+                          −{rupees(b.discount_amount)} {b.discount_reason}
+                        </div>
                       )}
                     </td>
                     <td className="actions">

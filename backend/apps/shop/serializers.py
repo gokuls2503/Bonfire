@@ -3,7 +3,9 @@ from decimal import Decimal
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
-from .models import BillItem, CounterSale, Product, ProductCategory, StockMovement
+from .models import (
+    BillItem, CounterSale, Payment, Product, ProductCategory, StockMovement,
+)
 
 
 class ProductCategorySerializer(serializers.ModelSerializer):
@@ -103,18 +105,29 @@ class BillItemSerializer(serializers.ModelSerializer):
         return attrs
 
 
+class PaymentSerializer(serializers.ModelSerializer):
+    method_display = serializers.CharField(source="get_method_display", read_only=True)
+
+    class Meta:
+        model = Payment
+        fields = ["id", "method", "method_display", "amount", "settled_at", "note"]
+
+
 class CounterSaleSerializer(serializers.ModelSerializer):
     items = BillItemSerializer(many=True, read_only=True)
+    payments = PaymentSerializer(many=True, read_only=True)
     items_total = serializers.DecimalField(max_digits=9, decimal_places=2, read_only=True)
+    total_due = serializers.DecimalField(max_digits=9, decimal_places=2, read_only=True)
 
     class Meta:
         model = CounterSale
         fields = [
             "id", "code", "customer", "full_name", "phone", "payment_status",
-            "payment_method", "amount_collected", "completed_at", "staff_notes",
-            "items", "items_total", "created_at",
+            "payment_method", "amount_collected", "discount_amount", "discount_reason",
+            "completed_at", "staff_notes", "items", "items_total", "total_due",
+            "payments", "created_at",
         ]
-        read_only_fields = ["code", "items_total"]
+        read_only_fields = ["code", "items_total", "total_due"]
 
 
 class CounterSaleCreateSerializer(serializers.Serializer):
@@ -122,7 +135,9 @@ class CounterSaleCreateSerializer(serializers.Serializer):
 
     full_name = serializers.CharField(required=False, allow_blank=True, max_length=120)
     phone = serializers.CharField(required=False, allow_blank=True, max_length=20)
-    payment_method = serializers.ChoiceField(choices=CounterSale.PaymentMethod.choices)
+    # Tendering is validated by apps.api.checkout, which accepts either a single
+    # `payment_method` or a `payments` list for a split.
+    payment_method = serializers.CharField(required=False, allow_blank=True)
     staff_notes = serializers.CharField(required=False, allow_blank=True)
     items = serializers.ListField(
         child=serializers.DictField(), allow_empty=False,

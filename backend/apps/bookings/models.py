@@ -82,6 +82,7 @@ class Booking(TimeStamped):
         UPI = "upi", "UPI"
         CARD = "card", "Card"
         OTHER = "other", "Other"
+        SPLIT = "split", "Split"
 
         @classmethod
         def online(cls):
@@ -132,6 +133,14 @@ class Booking(TimeStamped):
     )
     amount_due = models.DecimalField(max_digits=9, decimal_places=2, default=0)
     amount_collected = models.DecimalField(max_digits=9, decimal_places=2, default=0)
+    discount_amount = models.DecimalField(
+        max_digits=9, decimal_places=2, default=0,
+        help_text="Manual discount applied at checkout. Always a rupee figure.",
+    )
+    discount_reason = models.CharField(
+        max_length=140, blank=True,
+        help_text="Why it was given. Required whenever a discount is applied.",
+    )
     source = models.CharField(max_length=10, choices=Source.choices, default=Source.WEBSITE)
     notes = models.TextField(blank=True)
     staff_notes = models.TextField(blank=True)
@@ -228,8 +237,31 @@ class Booking(TimeStamped):
 
     @property
     def total_due(self):
-        """Station time plus everything on the bill — what the customer actually pays."""
+        """Station time plus items, less any discount — what the customer pays.
+
+        Floored at zero: comping a whole session must not produce a negative
+        bill that would then read as revenue.
+        """
+        from decimal import Decimal
+
+        gross = self.amount_due + self.items_total
+        return max(gross - self.discount_amount, Decimal("0.00"))
+
+    @property
+    def gross_due(self):
+        """The bill before any discount, for showing what was taken off."""
         return self.amount_due + self.items_total
+
+    def record_payments(self, tenders, discount=None, reason=None):
+        """Record how this bill was paid.
+
+        `tenders` is [(method, amount), ...] — one entry for a single method,
+        two for a cash/UPI split. Writes the Payment rows and this booking's
+        summary fields together so they cannot drift apart.
+        """
+        from apps.shop.models import _record_payments
+
+        return _record_payments(self, tenders, discount=discount, reason=reason)
 
     def release_rentals(self):
         """Hand rented kit back to the pool. Called when a bill is closed."""

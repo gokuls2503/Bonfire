@@ -16,6 +16,7 @@ from apps.shop.serializers import (
     ProductCategorySerializer, ProductSerializer, StockMovementSerializer,
 )
 
+from .checkout import resolve_discount, resolve_tenders
 from .permissions import IsStaffUser
 
 
@@ -122,17 +123,19 @@ def quick_sale(request):
             phone=data.get("phone", ""),
             staff_notes=data.get("staff_notes", ""),
             payment_status=CounterSale.PaymentStatus.PAID,
-            payment_method=data["payment_method"],
             completed_at=timezone.now(),
         )
-        total = Decimal("0.00")
+        gross = Decimal("0.00")
         for row in data["items"]:
             item = BillItem.objects.create(
                 sale=sale, product=row["product"], quantity=row["quantity"]
             )
-            total += item.line_total
-        sale.amount_collected = total
-        sale.save(update_fields=["amount_collected", "updated_at"])
+            gross += item.line_total
+
+        discount, reason = resolve_discount(request.data, gross)
+        net = max(gross - discount, Decimal("0.00"))
+        tenders = resolve_tenders(request.data, net) if net > 0 else []
+        sale.record_payments(tenders, discount=discount, reason=reason)
 
     return Response(
         CounterSaleSerializer(sale, context={"request": request}).data,

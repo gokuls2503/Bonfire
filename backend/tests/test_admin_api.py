@@ -113,12 +113,21 @@ class TestBookingLifecycle:
         assert booking.completed_at is not None
         assert station.status == Station.Status.AVAILABLE
 
-    def test_complete_accepts_a_different_amount(self, staff_api, pcs, make_booking):
+    def test_collecting_less_needs_a_discount(self, staff_api, pcs, make_booking):
+        """Taking less than the bill is only possible as a recorded discount.
+
+        Under-typing the amount used to be accepted silently, which understated
+        revenue with no trace of why.
+        """
         booking = make_booking(amount_due="70.00")
-        staff_api.post(f"/api/admin/bookings/{booking.id}/complete/",
-                       {"amount_collected": "50.00", "payment_method": "upi"}, format="json")
+        staff_api.post(f"/api/admin/bookings/{booking.id}/complete/", {
+            "payment_method": "upi",
+            "discount_amount": "20.00",
+            "discount_reason": "Regular",
+        }, format="json")
         booking.refresh_from_db()
         assert float(booking.amount_collected) == 50.0
+        assert float(booking.discount_amount) == 20.0
         assert booking.payment_method == Booking.PaymentMethod.UPI
 
     def test_cancel_releases_the_station(self, staff_api, pcs, make_booking):
