@@ -6,7 +6,7 @@ import {
   Empty, Loading, Modal, PageHead, Pill, STATUS_TONE, useToast,
 } from '../components/ui'
 
-const TIER_TONE = { walkin: '', member: 'info', vip: 'ember', banned: 'bad' }
+const TIER_TONE = { walkin: '', member: 'info', vip: 'flame', banned: 'bad' }
 
 export default function Customers() {
   const { items, total, loading, load } = useResource('/admin/customers/', { auto: false })

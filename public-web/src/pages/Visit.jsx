@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useSite } from '../lib/SiteContext'
 import { api, ApiError } from '../lib/api'
-import { telHref, timeLabel, whatsappHref } from '../lib/format'
+import { mapEmbedSrc, telHref, timeLabel, whatsappHref } from '../lib/format'
 import Icon from '../components/Icon'
 import './visit.css'
 
@@ -170,10 +170,10 @@ export default function Visit() {
             </p>
           </div>
 
-          {s.map_embed_url && (
+          {mapEmbedSrc(s) && (
             <div className="map-frame">
               <iframe
-                src={s.map_embed_url}
+                src={mapEmbedSrc(s)}
                 title="Map to Bonfire Gaming Hub"
                 loading="lazy"
                 referrerPolicy="no-referrer-when-downgrade"
@@ -181,6 +181,7 @@ export default function Visit() {
               />
             </div>
           )}
+
         </div>
 
         <ContactForm />

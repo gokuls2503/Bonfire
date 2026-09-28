@@ -28,8 +28,8 @@
   background: var(--ink-600);
   font-size: 0.78rem;
 }
-.stepper li.is-active { border-color: var(--ember-500); color: var(--bone-100); }
-.stepper li.is-active span { background: var(--ember-500); color: #fff; }
+.stepper li.is-active { border-color: var(--flame-500); color: var(--bone-100); }
+.stepper li.is-active span { background: var(--flame-500); color: #fff; }
 .stepper li.is-done { color: var(--ok); border-color: rgba(53, 198, 122, 0.35); }
 .stepper li.is-done span { background: rgba(53, 198, 122, 0.18); color: var(--ok); }
 
@@ -65,14 +65,14 @@
   transition: all 0.2s var(--ease);
 }
 .type-option svg { color: var(--bone-500); margin-bottom: 0.4rem; }
-.type-option strong { font-family: var(--font-display); font-size: 1.3rem; text-transform: uppercase; }
+.type-option strong { font-family: var(--font-display); font-style: italic; font-size: 1.3rem; text-transform: uppercase; }
 .type-option:hover { border-color: var(--ink-400); }
 .type-option.is-active {
-  border-color: var(--ember-500);
-  background: rgba(255, 77, 13, 0.07);
-  box-shadow: 0 0 0 1px var(--ember-500);
+  border-color: var(--flame-500);
+  background: rgba(0, 120, 240, 0.07);
+  box-shadow: 0 0 0 1px var(--flame-500);
 }
-.type-option.is-active svg { color: var(--ember-400); }
+.type-option.is-active svg { color: var(--flame-400); }
 
 .plan-picker { display: grid; gap: 0.85rem; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
 .plan-option {
@@ -90,11 +90,11 @@
 }
 .plan-option > .row { width: 100%; }
 .plan-option:hover { border-color: var(--ink-400); }
-.plan-option.is-active { border-color: var(--ember-500); background: rgba(255, 77, 13, 0.07); }
+.plan-option.is-active { border-color: var(--flame-500); background: rgba(0, 120, 240, 0.07); }
 .plan-option__price {
-  font-family: var(--font-display);
+  font-family: var(--font-display); font-style: italic;
   font-size: 1.75rem;
-  color: var(--ember-300);
+  color: var(--flame-300);
   line-height: 1;
   margin-top: 0.35rem;
 }
@@ -109,7 +109,7 @@
   cursor: pointer;
   transition: all 0.15s;
 }
-.seat-picker button:hover:not(:disabled) { border-color: var(--ember-500); color: var(--ember-400); }
+.seat-picker button:hover:not(:disabled) { border-color: var(--flame-500); color: var(--flame-400); }
 .seat-picker button:disabled { opacity: 0.3; cursor: not-allowed; }
 .seat-picker > span {
   font-family: var(--font-display);
@@ -142,11 +142,11 @@
   transition: all 0.18s var(--ease);
 }
 .date-chip:hover { border-color: var(--ink-400); }
-.date-chip.is-active { border-color: var(--ember-500); background: rgba(255, 77, 13, 0.1); }
+.date-chip.is-active { border-color: var(--flame-500); background: rgba(0, 120, 240, 0.1); }
 .date-chip__dow { font-size: 0.68rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--bone-500); }
 .date-chip__day { font-family: var(--font-display); font-size: 1.55rem; line-height: 1; }
 .date-chip__mon { font-size: 0.7rem; color: var(--bone-500); text-transform: uppercase; }
-.date-chip.is-active .date-chip__dow, .date-chip.is-active .date-chip__mon { color: var(--ember-300); }
+.date-chip.is-active .date-chip__dow, .date-chip.is-active .date-chip__mon { color: var(--flame-300); }
 
 .slot-legend { margin: 1.75rem 0 1rem; font-size: 0.8rem; color: var(--bone-500); gap: 1.1rem; }
 .slot-legend span { display: inline-flex; align-items: center; gap: 0.4rem; }
@@ -169,13 +169,13 @@
 }
 .slot strong { font-size: 0.95rem; }
 .slot span { color: var(--ok); font-size: 0.72rem; }
-.slot:hover:not(:disabled) { border-color: var(--ember-400); transform: translateY(-1px); }
+.slot:hover:not(:disabled) { border-color: var(--flame-400); transform: translateY(-1px); }
 .slot.is-tight span { color: var(--warn); }
 .slot.is-active {
-  border-color: var(--ember-500);
-  background: var(--ember-500);
+  border-color: var(--flame-500);
+  background: var(--flame-500);
   color: #fff;
-  box-shadow: 0 6px 20px -8px var(--ember-glow);
+  box-shadow: 0 6px 20px -8px var(--flame-glow);
 }
 .slot.is-active span { color: rgba(255, 255, 255, 0.85); }
 .slot:disabled { opacity: 0.32; cursor: not-allowed; }
@@ -211,14 +211,58 @@
   align-items: center;
   gap: 0.35rem;
   padding: 1.4rem 2.5rem;
-  border: 1px dashed var(--ember-500);
+  border: 1px dashed var(--flame-500);
   border-radius: var(--r-md);
-  background: rgba(255, 77, 13, 0.06);
+  background: rgba(0, 120, 240, 0.06);
   margin: 0.75rem 0;
 }
 .code-box strong {
   font-family: ui-monospace, 'SF Mono', Menlo, monospace;
   font-size: 2rem;
   letter-spacing: 0.14em;
-  color: var(--ember-300);
+  color: var(--flame-300);
 }
+
+/* Controller picker — a console is one screen a group shares, so the choice is
+   how many play, and the per-controller rate falls as the group grows. */
+.controller-picker {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+.controller-option {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 1rem;
+  text-align: left;
+  border: 1px solid var(--ink-600);
+  border-radius: var(--r-md);
+  background: var(--ink-800);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.controller-option:hover { border-color: var(--ink-400); }
+.controller-option.is-active {
+  border-color: var(--flame-500);
+  background: rgba(0, 120, 240, 0.07);
+}
+.controller-option > strong {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 900;
+  font-size: 1.9rem;
+  line-height: 1;
+}
+.controller-option__rate {
+  margin-top: 0.4rem;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 900;
+  font-size: 1.35rem;
+  color: var(--flame-300);
+  line-height: 1;
+}
+
+/* The controller count drives the price, so it sits with the total. */
+.seat-picker__breakdown { flex-basis: 100%; margin-top: 0.35rem; }

@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Game, PricingPlan, Station, StationType
+from .models import ControllerRate, Game, PricingPlan, Station, StationType
 
 
 class StationInline(admin.TabularInline):
@@ -12,7 +12,14 @@ class StationInline(admin.TabularInline):
 class PricingPlanInline(admin.TabularInline):
     model = PricingPlan
     extra = 0
-    fields = ("name", "duration_minutes", "price", "badge", "is_active", "sort_order")
+    fields = ("name", "duration_minutes", "price", "badge", "is_active", "is_bookable",
+              "sort_order")
+
+
+class ControllerRateInline(admin.TabularInline):
+    model = ControllerRate
+    extra = 0
+    fields = ("controllers", "price_per_controller")
 
 
 @admin.register(StationType)
@@ -32,8 +39,10 @@ class StationAdmin(admin.ModelAdmin):
 
 @admin.register(PricingPlan)
 class PricingPlanAdmin(admin.ModelAdmin):
-    list_display = ("name", "station_type", "duration_minutes", "price", "is_active")
-    list_filter = ("station_type", "is_active")
+    list_display = ("name", "station_type", "duration_minutes", "price", "is_active",
+                    "is_bookable")
+    list_filter = ("station_type", "is_active", "is_bookable")
+    inlines = [ControllerRateInline]
 
 
 @admin.register(Game)

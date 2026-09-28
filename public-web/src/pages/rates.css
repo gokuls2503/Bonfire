@@ -1,0 +1,82 @@
+/* Monthly memberships, sitting under the per-session rates.
+
+   Visually separated from the pricing grids above it so nobody reads a
+   membership price as another way to pay for one session. */
+.memberships {
+  margin-bottom: 4rem;
+  padding-top: 3rem;
+  border-top: 1px solid var(--ink-600);
+}
+
+.member-card {
+  display: flex;
+  flex-direction: column;
+}
+
+/* A flex column stretches its children; the badge has to hug its own text. */
+.member-card > .tag { align-self: flex-start; }
+
+/* The badged plan is the one the owner wants read first. */
+.member-card--featured {
+  border-color: rgba(0, 168, 240, 0.35);
+  background:
+    linear-gradient(160deg, rgba(0, 120, 240, 0.07), transparent 60%),
+    var(--ink-800);
+}
+
+.member-card__price {
+  margin: 1.25rem 0 0.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.member-card__figure {
+  font-family: var(--font-display); font-style: italic;
+  font-size: 2.4rem;
+  line-height: 1;
+}
+
+.perks {
+  list-style: none;
+  margin: 1.25rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.perks li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  font-size: 0.9rem;
+  color: var(--bone-300);
+  line-height: 1.45;
+}
+
+.perks svg {
+  flex: none;
+  margin-top: 0.25rem;
+  color: var(--flame-400);
+}
+
+.member-card__platforms {
+  margin-top: auto;
+  padding-top: 1.25rem;
+}
+
+.member-note {
+  margin-top: 1.5rem;
+  max-width: 60ch;
+}
+
+.rate-figure { font-family: var(--font-display); font-size: 2.4rem; line-height: 1; }
+
+/* The per-controller grid on a console plan. */
+.rate-tiers { width: 100%; border-collapse: collapse; margin: 0.85rem 0 0.25rem; }
+.rate-tiers tr + tr th, .rate-tiers tr + tr td { border-top: 1px solid var(--ink-700); }
+.rate-tiers th, .rate-tiers td { padding: 0.4rem 0; font-size: 0.85rem; font-weight: 400; }
+.rate-tiers th { text-align: left; color: var(--bone-500); }
+.rate-tiers td { text-align: right; }
+.rate-tiers td strong { color: var(--flame-300); }

@@ -96,7 +96,7 @@ function SettingsForm({ group }) {
           <hr style={{ border: 0, borderTop: '1px solid var(--ink-600)', margin: '1.25rem 0' }} />
           <Input label="Hero eyebrow" name="hero_eyebrow" value={form.hero_eyebrow || ''} onChange={set('hero_eyebrow')} />
           <Input label="Hero headline" name="hero_headline" value={form.hero_headline || ''}
-            onChange={set('hero_headline')} hint="Alternate words are painted in the ember gradient." />
+            onChange={set('hero_headline')} hint="Alternate words are painted in the flame gradient." />
           <Textarea label="Hero subline" name="hero_subline" value={form.hero_subline || ''} onChange={set('hero_subline')} />
           <div className="field-grid">
             <Input label="Hero button label" name="hero_cta_label" value={form.hero_cta_label || ''}

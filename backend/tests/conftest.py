@@ -3,12 +3,27 @@ from datetime import time, timedelta
 
 import pytest
 from django.contrib.auth.models import User
+from django.core.cache import cache
 from django.utils import timezone
 from rest_framework.test import APIClient
 
 from apps.bookings.models import Booking, BusinessHours
 from apps.catalog.models import PricingPlan, Station, StationType
 from apps.content.models import SiteSettings
+
+
+@pytest.fixture(autouse=True)
+def _reset_throttles():
+    """Public writes are throttled at 20/hour, counted in the default cache.
+
+    That cache outlives a single test, so without this the suite passes only
+    while the total number of public writes across every test stays under the
+    limit — the 21st one fails, in whichever test happens to run last. Clearing
+    between tests makes each one independent, which is what they already assume.
+    """
+    cache.clear()
+    yield
+    cache.clear()
 
 
 @pytest.fixture

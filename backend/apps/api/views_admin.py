@@ -14,9 +14,9 @@ from apps.bookings.models import Booking, BusinessHours, Closure
 from apps.bookings.serializers import (
     BookingSerializer, BusinessHoursSerializer, ClosureSerializer,
 )
-from apps.catalog.models import Game, PricingPlan, Station, StationType
+from apps.catalog.models import ControllerRate, Game, PricingPlan, Station, StationType
 from apps.catalog.serializers import (
-    GameSerializer, PricingPlanSerializer, StationSerializer,
+    ControllerRateSerializer, GameSerializer, PricingPlanSerializer, StationSerializer,
     StationTypeSerializer, StationTypeWriteSerializer,
 )
 from apps.content.models import ContactMessage, FAQ, GalleryImage, SiteSettings, Testimonial
@@ -26,6 +26,7 @@ from apps.content.serializers import (
 )
 from apps.customers.models import Customer
 from apps.customers.serializers import CustomerSerializer
+from apps.memberships.models import Membership
 from apps.tournaments.models import Tournament, TournamentRegistration
 from apps.tournaments.serializers import (
     TournamentRegistrationSerializer, TournamentSerializer,
@@ -75,6 +76,15 @@ class PricingPlanViewSet(StaffViewSet):
     queryset = PricingPlan.objects.select_related("station_type")
     serializer_class = PricingPlanSerializer
     filterset_fields = ["station_type", "is_active"]
+    pagination_class = None
+
+
+class ControllerRateViewSet(StaffViewSet):
+    """The per-controller price grid behind a console plan."""
+
+    queryset = ControllerRate.objects.select_related("plan", "plan__station_type")
+    serializer_class = ControllerRateSerializer
+    filterset_fields = ["plan", "controllers"]
     pagination_class = None
 
 
@@ -129,6 +139,33 @@ class BookingViewSet(StaffViewSet):
         booking.save(update_fields=fields)
         return Response(BookingSerializer(booking).data)
 
+    def _draw_membership_hours(self, booking):
+        """Record a completed session against the member's allowance.
+
+        Deliberately does nothing to the bill. The allowance is tracked so the
+        member and the counter both know where the hours went; what to charge
+        stays a decision staff make at checkout, exactly as it did before
+        memberships existed.
+        """
+        if not booking.customer_id:
+            return None
+        membership = Membership.current_for(booking.customer)
+        if membership is None:
+            return None
+
+        entry, billable = membership.draw_for_booking(booking)
+        if entry is None and not billable:
+            return None
+
+        membership.refresh_from_db()
+        return {
+            "code": membership.code,
+            "plan": membership.plan_name,
+            "hours_drawn": float(entry.hours) if entry else 0.0,
+            "hours_billable": float(billable),
+            "hours_remaining": float(membership.hours_remaining or 0),
+        }
+
     @action(detail=True, methods=["post"])
     def confirm(self, request, pk=None):
         booking = self.get_object()
@@ -172,13 +209,17 @@ class BookingViewSet(StaffViewSet):
             Station.objects.filter(pk=booking.station_id).update(status=Station.Status.AVAILABLE)
         # Rented kit goes back on the shelf the moment the bill is closed.
         booking.release_rentals()
+        drawn = self._draw_membership_hours(booking)
 
-        return self._transition(
+        response = self._transition(
             booking,
             Booking.Status.COMPLETED,
             completed_at=timezone.now(),
             payment_status=payment_status,
         )
+        if drawn:
+            response.data["membership_draw"] = drawn
+        return response
 
     @action(detail=True, methods=["post"])
     def record_payment(self, request, pk=None):
@@ -201,12 +242,15 @@ class BookingViewSet(StaffViewSet):
         if booking.station_id:
             Station.objects.filter(pk=booking.station_id).update(status=Station.Status.AVAILABLE)
         booking.release_rentals()
+        # A session that never happened must not cost the member their hours.
+        Membership.credit_for_booking(booking)
         return self._transition(booking, Booking.Status.CANCELLED)
 
     @action(detail=True, methods=["post"])
     def no_show(self, request, pk=None):
         booking = self.get_object()
         booking.release_rentals()
+        Membership.credit_for_booking(booking)
         return self._transition(booking, Booking.Status.NO_SHOW)
 
 

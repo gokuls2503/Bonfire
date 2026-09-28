@@ -33,7 +33,7 @@ export default function Games() {
         { key: 'genre', label: 'Genre', render: (g) => g.genre || '—' },
         { key: 'platform_names', label: 'Platforms', render: (g) => g.platform_names?.join(', ') || '—' },
         { key: 'is_featured', label: 'Featured', render: (g) =>
-          g.is_featured ? <Pill tone="ember">Featured</Pill> : <span className="muted">—</span> },
+          g.is_featured ? <Pill tone="flame">Featured</Pill> : <span className="muted">—</span> },
         { key: 'is_active', label: 'Live', render: (g) =>
           <Pill tone={g.is_active ? 'ok' : 'bad'}>{g.is_active ? 'Live' : 'Hidden'}</Pill> },
       ]}

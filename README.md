@@ -49,6 +49,10 @@ so it is safe to re-run.
 - **Booking flow** — pick platform → plan → date → time slot → details.
   Availability is computed from real capacity and existing bookings, in 30-minute
   steps, respecting opening hours, closures, minimum notice and the booking horizon.
+- **Monthly memberships** — under the Rates tab: price, term, included hours,
+  member discount and perks per scheme. Only plans marked public are listed, and
+  the hours/discount lines are rendered from their own fields rather than typed
+  into the perk text, so a scheme the owner adds in the admin describes itself.
 - **Tournaments** — list, detail page with rules and prize breakdown, and team
   or solo registration
 - **Find my booking** — every phone gets a permanent customer code; enter it to
@@ -84,11 +88,24 @@ so it is safe to re-run.
   length; the close-out screen bills station time plus items as one total.
 - **Counter sale** — ring up a walk-in who only wants a drink. Lands in the
   sales report next to sessions.
-- **Pricing** — per-platform plans with badges, happy-hour windows and struck-through prices
+- **Pricing** — per-platform plans with badges, happy-hour windows and
+  struck-through prices, a per-rate switch for whether online booking may
+  offer it at all (happy hour is advertised but sold at the counter), and a
+  per-controller rate grid for console plans
 - **Tournaments & registrations** — create events, approve teams, mark entry fees
   paid, and clone a weekly event forward one week at a time
 - **Customers** — auto-created from bookings, with tier (walk-in / member / VIP /
-  banned) and per-customer booking history
+  banned), per-customer booking history and the membership in force today
+- **Memberships** — sell a monthly term to a phone number, take or waive the fee,
+  renew, pause, resume or cancel it, and switch auto-renew on. Filters for
+  active, expiring this week, unpaid, paused and lapsed
+- **Hour tracking** — a completed session draws from the member's allowance
+  automatically, a cancelled one hands the hours straight back, and staff can
+  draw or credit hours by hand. Every line is itemised in a per-member ledger
+- **Membership plans** — the schemes themselves: price, term length, included
+  hours, member discount, perks and which platforms they cover — all editable
+- **Checkout knows about members** — closing out a session shows the customer's
+  plan and hours left, with one tap to apply the discount rate they paid for
 - **Hours & closures** — weekly opening hours and one-off holiday closures
 - **Site content** — brand, hero copy, about text, announcement banner, contact
   details, socials, booking rules, SEO and social share image
@@ -216,6 +233,25 @@ Anything scripting this endpoint needs updating.
 
 ## Notes for whoever works on this next
 
+- **A console is priced per controller, a PC per station.**
+  `StationType.prices_per_controller` picks which, and `ControllerRate` holds a
+  price per (plan, controller count). The rate falls as the group grows — four
+  people on one PS5 pay less each than one person alone, while the console earns
+  more overall — so it is stored as a grid the owner fills in rather than a
+  formula. `PricingPlan.price_for(controllers, seats)` is the single place that
+  answers "what does this cost", so nothing downstream branches on station type.
+  `rate_for()` falls back to the largest configured size below the one asked
+  for, so a plan priced to 4 still answers for 5 instead of failing.
+- **A per-controller plan's flat `price` stops being the selling price.** Every
+  public surface (rates, home list, station card "from") reads the grid instead,
+  because leaving `plan.price` on screen advertised the old figure.
+- **A rate can be advertised without being bookable.** `PricingPlan.is_active`
+  puts it on the public site; `is_bookable` decides whether the booking flow
+  offers it. Happy hour needs the first without the second: the flow picks a
+  slot days ahead and never knew whether the customer would arrive inside the
+  window, so the discounted rate was bookable for any hour of the day. The
+  picker hides counter-only rates and `PublicBookingCreateSerializer` rejects
+  them, because hiding a control is not a rule — the id can still be posted.
 - **Capacity is enforced in `Booking.clean()`**, not in the serializer, so
   staff-created bookings and website bookings obey the same rule. Overlap is
   computed in Python because `end_at` is derived (`start_at + duration_minutes`)
@@ -281,8 +317,61 @@ Anything scripting this endpoint needs updating.
   `ONLINE_METHODS`, so a card machine is one line in
   `admin-web/src/components/PaymentModal.jsx` with no migration; existing rows
   and the report already handle them.
+- **Memberships sit beside the booking flow, not inside it** (`apps/memberships/`).
+  Selling, renewing or lapsing a term never touches a booking, a bill or a
+  station, and no discount is applied automatically — the plan records what a
+  member gets (`discount_percent`, `included_hours`) and staff apply it at
+  checkout. Adding it changed no existing behaviour.
+- **A sold term snapshots its plan** (price, duration, discount, included hours),
+  so raising the price of a scheme tomorrow never rewrites what someone paid
+  today — the same rule bill lines follow.
+- **Usage is a ledger, not a counter** (`memberships.MembershipUsage`).
+  `hours_used` is a cached sum recomputed from the rows, never incremented in
+  place, which is what makes a draw reversible: cancelling a session deletes its
+  row and the balance follows. A booking draws exactly once (`booking` is a
+  OneToOne), so completing a session twice cannot double-charge the allowance.
+- **A draw never touches the bill.** Completing a member's session records the
+  hours and reports what fell outside the allowance as `hours_billable`; what to
+  charge stays a decision staff make at checkout. The booking flow behaves
+  exactly as it did before memberships existed.
+- **Pausing freezes the clock both ways.** `days_remaining` stops at the pause
+  date and `resume()` pushes `ends_on` out by however long the freeze lasted, so
+  the member gets back exactly the days they lost — no more.
+- **Nothing expires on a schedule.** A term lapses on its own the moment the
+  calendar passes `ends_on`. `manage.py memberships` only reports; only
+  `--roll` writes, and it just creates the next term for auto-renewers and
+  leaves the fee unpaid for the counter to take.
+- **A membership's state is derived, not stored.** `status` only says active or
+  cancelled; `state` ages it by the calendar into unpaid / scheduled / active /
+  expired, so nothing has to run a nightly job to expire anybody. The admin's
+  `?state=` filter rebuilds the same logic in SQL.
+- **Membership fees are their own revenue stream** in the sales report, reported
+  like tournament entry fees rather than through the `Payment` table — one
+  tender, no bill lines, nothing that splits.
 - **Nothing fake is ever seeded.** `manage.py seed` creates the cafe's real
   configuration but no takings, so the Sales page starts genuinely empty and
   every number on it is money you actually took.
-- The supplied logo ships on a solid black plate; both front-ends drop it out with
-  `mix-blend-mode: lighten` rather than requiring a re-cut PNG.
+- **`logo.png` is a real alpha cut-out**, identical in both front-ends. The
+  supplied artwork ships on a solid black plate; `mix-blend-mode: lighten` used
+  to drop it out, but the source is a JPEG, so its "black" is compression-noisy
+  and never quite matched the page — it left a visible dark square. The plate is
+  now cut properly: a flood fill from the corners decides what is outside the
+  mark (so the logo's own dark areas, like the (15, 37, 74) controller body,
+  stay opaque), and inside that region alpha follows luminance, which lets the
+  outer glow fade out instead of ending on a hard ring. Nothing needs a blend
+  mode now, so the logo sits correctly on any background.
+- **The heading voice is one rule, not a dozen.** Headings are Barlow Condensed
+  italic 900, matching the slant on the logo's wordmark, and that lives on the
+  `h1-h4` rule in each app's `index.css`. It used to be pasted into a dozen
+  per-section rules in `home.css`, which is exactly why every other page drifted
+  upright. Display-font *content* (prices, big numerals, mottos) takes the same
+  slant; UI chrome — buttons, eyebrows, "SPECIFICATIONS" labels, availability
+  pills — stays upright, because a slant costs legibility at those sizes and
+  buys nothing. The admin uses weight 800 rather than 900: its headings sit on
+  dense data screens where a heavier slant competes with the numbers.
+- **The palette is sampled from the logo, not guessed.** `--flame-500/400/300`
+  are the logo's own azure and cyan (hues 186–210), `--ink-*` is its near-black
+  plate and `--bone-*` its ice-white type. Every accent in both front-ends comes
+  from those tokens, so re-theming to a new logo means resampling four values.
+  `--ok`, `--warn` and `--bad` stay green/amber/red: they mean a state, not a
+  brand, and recolouring them to match a logo would cost the reader the meaning.

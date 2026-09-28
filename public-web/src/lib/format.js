@@ -58,3 +58,34 @@ export const telHref = (phone) => `tel:${String(phone || '').replace(/[^\d+]/g, 
 /** wa.me wants digits only, no plus. */
 export const whatsappHref = (number) =>
   `https://wa.me/${String(number || '').replace(/\D/g, '')}`
+
+/** A Google Maps URL an iframe will actually render.
+
+    The owner pastes whatever the Maps share sheet gives them, which is usually
+    a `maps.app.goo.gl` short link. Google serves those with
+    `X-Frame-Options: sameorigin`, so they load as a blank box rather than a map.
+    An embeddable URL says so in the query, and anything else falls back to a
+    search on the address — which always renders and is never blank. */
+export const mapEmbedSrc = (settings) => {
+  const url = settings?.map_embed_url || ''
+  if (url.includes('/maps/embed') || url.includes('output=embed')) return url
+  const place = settings?.full_address || settings?.brand_name || ''
+  if (!place) return ''
+  return `https://www.google.com/maps?q=${encodeURIComponent(place)}&output=embed`
+}
+
+/** Where "open in Google Maps" should send someone.
+
+    `directions_url` is the field that exists for this — a share link resolves
+    to the exact pin the owner dropped. The embed URL is only a fallback for
+    the case where it was pasted into the wrong box, and a search on the
+    address is the last resort so the link is never dead. */
+export const mapLink = (settings) => {
+  if (settings?.directions_url) return settings.directions_url
+  const embed = settings?.map_embed_url || ''
+  if (embed && !embed.includes('output=embed')) return embed
+  const place = settings?.full_address || ''
+  return place
+    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place)}`
+    : ''
+}

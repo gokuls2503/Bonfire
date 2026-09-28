@@ -20,10 +20,12 @@
   padding: 1.1rem 1.15rem;
   border-bottom: 1px solid var(--ink-600);
 }
-.sidebar__brand img { width: 34px; height: 34px; object-fit: contain; mix-blend-mode: lighten; }
+.sidebar__brand img { width: 34px; height: 34px; object-fit: contain; }
 .sidebar__brand div { display: flex; flex-direction: column; line-height: 1.1; }
 .sidebar__brand strong {
   font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 900;
   font-size: 1.15rem;
   text-transform: uppercase;
   letter-spacing: 0.02em;
@@ -32,7 +34,7 @@
   font-size: 0.62rem;
   letter-spacing: 0.28em;
   text-transform: uppercase;
-  color: var(--ember-400);
+  color: var(--flame-400);
 }
 
 .sidebar__nav { flex: 1; overflow-y: auto; padding: 0.85rem 0.6rem; }
@@ -60,8 +62,8 @@
 .sidebar__link svg { color: var(--bone-600); flex-shrink: 0; transition: color 0.14s; }
 .sidebar__link:hover { background: var(--ink-750); color: var(--bone-100); }
 .sidebar__link:hover svg { color: var(--bone-300); }
-.sidebar__link.is-active { background: rgba(255, 77, 13, 0.1); color: var(--ember-300); }
-.sidebar__link.is-active svg { color: var(--ember-400); }
+.sidebar__link.is-active { background: rgba(0, 120, 240, 0.1); color: var(--flame-300); }
+.sidebar__link.is-active svg { color: var(--flame-400); }
 .sidebar__badge {
   margin-left: auto;
   min-width: 19px;
@@ -70,7 +72,7 @@
   display: grid;
   place-items: center;
   border-radius: var(--r-full);
-  background: var(--ember-500);
+  background: var(--flame-500);
   color: #fff;
   font-size: 0.68rem;
   font-weight: 700;
@@ -93,7 +95,7 @@
   flex-shrink: 0;
   display: grid; place-items: center;
   border-radius: var(--r-full);
-  background: linear-gradient(140deg, var(--ember-400), var(--ember-500));
+  background: linear-gradient(140deg, var(--flame-400), var(--flame-500));
   color: #fff;
   font-family: var(--font-display);
   font-size: 1rem;

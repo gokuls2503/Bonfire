@@ -165,7 +165,7 @@ export default function TournamentDetail() {
             <Icon name="arrow" size={14} style={{ transform: 'rotate(180deg)' }} /> All tournaments
           </Link>
           <div className="row row--wrap" style={{ gap: '0.5rem', marginTop: '1rem' }}>
-            <span className="tag tag--ember">{t.game}</span>
+            <span className="tag tag--flame">{t.game}</span>
             <span className="tag">{t.format_display}</span>
             {t.team_size > 1 && <span className="tag">{t.team_size}v{t.team_size}</span>}
             <span className={`tag ${t.is_registration_open ? 'tag--ok' : 'tag--bad'}`}>
@@ -244,7 +244,7 @@ export default function TournamentDetail() {
             <RegisterForm tournament={t} onDone={() => setRegistered(true)} />
           ) : (
             <div className="card center">
-              <Icon name="trophy" size={30} style={{ color: 'var(--ember-400)' }} />
+              <Icon name="trophy" size={30} style={{ color: 'var(--flame-400)' }} />
               <h3 style={{ margin: '0.75rem 0' }}>
                 {t.status === 'completed' ? 'This one is done' : 'Registration closed'}
               </h3>

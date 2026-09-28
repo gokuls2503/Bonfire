@@ -39,7 +39,14 @@ class SiteSettings(TimeStamped):
     city = models.CharField(max_length=60, blank=True)
     state = models.CharField(max_length=60, blank=True)
     postal_code = models.CharField(max_length=12, blank=True)
-    map_embed_url = models.URLField(blank=True, help_text="Google Maps embed src URL.")
+    map_embed_url = models.URLField(
+        blank=True,
+        help_text="Google Maps link for the shop. A share link (maps.app.goo.gl) is "
+                  "fine — it is used for the 'open in Maps' buttons. Google will not "
+                  "display share links inside a frame, so the embedded map falls back "
+                  "to a search on the address above. For the exact pin in the embed, "
+                  "paste the src from Maps > Share > Embed a map.",
+    )
     directions_url = models.URLField(blank=True)
 
     instagram_url = models.URLField(blank=True)

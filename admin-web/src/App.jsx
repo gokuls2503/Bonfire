@@ -14,6 +14,8 @@ import CounterSale from './pages/CounterSale'
 import Pricing from './pages/Pricing'
 import Games from './pages/Games'
 import Customers from './pages/Customers'
+import Memberships from './pages/Memberships'
+import MembershipPlans from './pages/MembershipPlans'
 import Tournaments from './pages/Tournaments'
 import Registrations from './pages/Registrations'
 import Hours from './pages/Hours'
@@ -54,6 +56,8 @@ function Console() {
         <Route path="/pricing" element={<Pricing />} />
         <Route path="/games" element={<Games />} />
         <Route path="/customers" element={<Customers />} />
+        <Route path="/memberships" element={<Memberships />} />
+        <Route path="/membership-plans" element={<MembershipPlans />} />
         <Route path="/tournaments" element={<Tournaments />} />
         <Route path="/registrations" element={<Registrations />} />
         <Route path="/hours" element={<Hours />} />

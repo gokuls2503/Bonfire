@@ -1,24 +1,24 @@
-/* Bonfire admin — dense, functional, same ember identity as the public site. */
+/* Bonfire admin — dense, functional, same blue-flame identity as the public site. */
 @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Inter:wght@400;500;600;700&display=swap');
 
 :root {
-  --ember-500: #ff4d0d;
-  --ember-400: #ff7a18;
-  --ember-300: #ffa22b;
+  --flame-500: #0078f0;
+  --flame-400: #00a8f0;
+  --flame-300: #00c0f0;
 
-  --ink-900: #08080a;
-  --ink-850: #0c0c0f;
-  --ink-800: #111116;
-  --ink-750: #14141a;
-  --ink-700: #17171d;
-  --ink-600: #1f1f27;
-  --ink-500: #2a2a34;
-  --ink-400: #3a3a46;
+  --ink-900: #05070c;
+  --ink-850: #080b11;
+  --ink-800: #0d1118;
+  --ink-750: #141922;
+  --ink-700: #161c26;
+  --ink-600: #1d2431;
+  --ink-500: #28303f;
+  --ink-400: #384456;
 
-  --bone-100: #f6f5f3;
-  --bone-300: #c9c7c2;
-  --bone-500: #8d8b86;
-  --bone-600: #6b6a66;
+  --bone-100: #f2f7fb;
+  --bone-300: #c3cedb;
+  --bone-500: #8793a3;
+  --bone-600: #667283;
 
   --ok: #35c67a;
   --warn: #ffb020;
@@ -56,11 +56,16 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 h1, h2, h3 {
   font-family: var(--font-display);
-  font-weight: 700;
+  /* Same heading voice as the public site, so the two surfaces read as one
+     brand. Weight stays below the site's 900: these sit on dense data screens
+     where a heavier slant starts competing with the numbers underneath. */
+  font-style: italic;
+  font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.01em;
   line-height: 1;
   margin: 0;
+  padding-right: 0.05em;   /* italic overhang */
 }
 h1 { font-size: 2rem; }
 h2 { font-size: 1.4rem; }
@@ -68,8 +73,8 @@ h3 { font-size: 1.1rem; }
 p { margin: 0 0 0.75rem; }
 p:last-child { margin-bottom: 0; }
 
-:focus-visible { outline: 2px solid var(--ember-400); outline-offset: 2px; border-radius: var(--r-sm); }
-::selection { background: var(--ember-500); color: #fff; }
+:focus-visible { outline: 2px solid var(--flame-400); outline-offset: 2px; border-radius: var(--r-sm); }
+::selection { background: var(--flame-500); color: #fff; }
 
 .muted { color: var(--bone-500); }
 .small { font-size: 0.8rem; }
@@ -95,7 +100,7 @@ p:last-child { margin-bottom: 0; }
   padding: 0.55rem 1.05rem;
   border: 1px solid transparent;
   border-radius: var(--r-md);
-  background: var(--ember-500);
+  background: var(--flame-500);
   color: #fff;
   font-size: 0.85rem;
   font-weight: 600;
@@ -103,7 +108,7 @@ p:last-child { margin-bottom: 0; }
   white-space: nowrap;
   transition: background 0.16s, border-color 0.16s, transform 0.12s;
 }
-.btn:hover:not(:disabled) { background: var(--ember-400); }
+.btn:hover:not(:disabled) { background: var(--flame-400); }
 .btn:active:not(:disabled) { transform: translateY(1px); }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; }
 .btn--ghost { background: var(--ink-750); border-color: var(--ink-500); color: var(--bone-100); }
@@ -150,7 +155,7 @@ p:last-child { margin-bottom: 0; }
 .pill--warn { background: rgba(255,176,32,0.12); border-color: rgba(255,176,32,0.35); color: var(--warn); }
 .pill--bad { background: rgba(255,77,77,0.12); border-color: rgba(255,77,77,0.35); color: var(--bad); }
 .pill--info { background: rgba(77,159,255,0.12); border-color: rgba(77,159,255,0.35); color: var(--info); }
-.pill--ember { background: rgba(255,77,13,0.12); border-color: rgba(255,77,13,0.35); color: var(--ember-300); }
+.pill--flame { background: rgba(0, 120, 240, 0.12); border-color: rgba(0, 120, 240, 0.35); color: var(--flame-300); }
 
 /* ---------- forms ---------- */
 .field { display: flex; flex-direction: column; gap: 0.35rem; margin-bottom: 0.9rem; }
@@ -161,6 +166,9 @@ p:last-child { margin-bottom: 0; }
   text-transform: uppercase;
   color: var(--bone-500);
 }
+/* Inputs sitting straight in a data table, not wrapped in a .field — they
+   still have to look like every other input in the console. */
+.data input[type="number"], .data input[type="text"],
 .field input[type="text"], .field input[type="tel"], .field input[type="email"],
 .field input[type="password"], .field input[type="number"], .field input[type="date"],
 .field input[type="time"], .field input[type="datetime-local"], .field input[type="url"],
@@ -172,8 +180,9 @@ p:last-child { margin-bottom: 0; }
   width: 100%;
   transition: border-color 0.15s;
 }
+.data input:focus,
 .field input:focus, .field select:focus, .field textarea:focus {
-  border-color: var(--ember-500);
+  border-color: var(--flame-500);
   outline: none;
 }
 .field textarea { resize: vertical; min-height: 90px; font-family: inherit; }
@@ -181,7 +190,7 @@ p:last-child { margin-bottom: 0; }
 .field .error { font-size: 0.76rem; color: var(--bad); }
 .field--check { flex-direction: row; align-items: center; gap: 0.55rem; }
 .field--check label { text-transform: none; letter-spacing: 0; font-size: 0.85rem; color: var(--bone-100); }
-.field--check input { width: 16px; height: 16px; accent-color: var(--ember-500); }
+.field--check input { width: 16px; height: 16px; accent-color: var(--flame-500); }
 .field-grid { display: grid; gap: 0 0.9rem; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
 
 /* ---------- notices ---------- */
@@ -331,7 +340,7 @@ table.data td.actions .btn { margin-left: 0.35rem; }
   padding: 0.45rem 0.7rem;
   min-width: 150px;
 }
-.toolbar input:focus, .toolbar select:focus { border-color: var(--ember-500); outline: none; }
+.toolbar input:focus, .toolbar select:focus { border-color: var(--flame-500); outline: none; }
 
 .seg { display: flex; gap: 0.25rem; padding: 0.22rem; background: var(--ink-800); border: 1px solid var(--ink-600); border-radius: var(--r-md); }
 .seg button {

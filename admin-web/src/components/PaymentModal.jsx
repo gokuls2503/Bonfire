@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { api } from '../lib/api'
 import { rupees } from '../lib/format'
 import { ChangeDue, DiscountBlock, TenderBlock, useCheckout } from './checkout'
-import { Modal, useToast } from './ui'
+import { Modal, Pill, useToast } from './ui'
 import './payment.css'
 
 /** Close out a session, or settle one that was left unpaid. */
@@ -14,12 +14,37 @@ export default function PaymentModal({ booking, mode = 'complete', onDone, onClo
   const gross = Number(booking.gross_due ?? station + items)
 
   const [outcome, setOutcome] = useState('paid')
+  const [membership, setMembership] = useState(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
   const checkout = useCheckout(gross)
   const toast = useToast()
 
   const canSubmit = outcome === 'paid' ? checkout.canTender : !checkout.needsReason
+
+  // Who is in front of you: a live membership changes what you offer them, so
+  // it is fetched for this one booking rather than carried on every booking row.
+  useEffect(() => {
+    if (!booking.phone) return undefined
+    let cancelled = false
+    api.get(`/admin/memberships/?state=active&customer_phone=${encodeURIComponent(booking.phone)}`)
+      .then((res) => {
+        const rows = Array.isArray(res) ? res : res?.results || []
+        if (!cancelled) setMembership(rows[0] || null)
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [booking.phone])
+
+  const memberDiscount = Number(membership?.discount_percent || 0)
+
+  /** One tap applies the rate the member already paid for. Staff still choose. */
+  const applyMemberDiscount = () => {
+    checkout.setShowDiscount(true)
+    checkout.setDiscountMode('percent')
+    checkout.setDiscountInput(String(memberDiscount))
+    checkout.setDiscountReason(`Member — ${membership.plan_name}`)
+  }
 
   const submit = async (event) => {
     event.preventDefault()
@@ -34,9 +59,13 @@ export default function PaymentModal({ booking, mode = 'complete', onDone, onClo
       }
 
       const endpoint = mode === 'settle' ? 'record_payment' : 'complete'
-      await api.post(`/admin/bookings/${booking.id}/${endpoint}/`, body)
+      const res = await api.post(`/admin/bookings/${booking.id}/${endpoint}/`, body)
+      const drawn = res?.membership_draw
       toast(
-        `${booking.code} — ${outcome === 'paid' ? checkout.summary() : `marked ${outcome}`}`,
+        `${booking.code} — ${outcome === 'paid' ? checkout.summary() : `marked ${outcome}`}`
+        + (drawn
+          ? ` · ${drawn.hours_drawn} hr off ${drawn.plan}, ${drawn.hours_remaining} left`
+          : ''),
       )
       onDone()
     } catch (err) {
@@ -96,6 +125,27 @@ export default function PaymentModal({ booking, mode = 'complete', onDone, onClo
             )}
           </div>
         </div>
+
+        {membership && (
+          <div className="member-flag">
+            <div>
+              <Pill tone="flame">Member</Pill>
+              <strong>{membership.plan_name}</strong>
+              <span className="small muted">
+                {membership.has_hour_allowance
+                  ? `${Number(membership.hours_remaining)} of ${Number(membership.included_hours)} hrs left`
+                  : 'Discount-only scheme'}
+                {' · '}{membership.days_remaining} days left
+              </span>
+            </div>
+            {memberDiscount > 0 && checkout.discount === 0 && (
+              <button type="button" className="btn btn--ghost btn--sm"
+                onClick={applyMemberDiscount}>
+                Apply {memberDiscount}% member rate
+              </button>
+            )}
+          </div>
+        )}
 
         <div className="seg pay-outcome">
           {[['paid', 'Paid'], ['unpaid', 'Leave unpaid'], ['waived', 'Waive']].map(([v, l]) => (

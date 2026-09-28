@@ -333,7 +333,7 @@ export default function Bookings() {
                       <Pill tone={STATUS_TONE[b.status]}>{b.status_display}</Pill>
                       <div style={{ marginTop: '0.25rem' }}>
                         <Pill tone={
-                          b.payment_method === 'split' ? 'ember' : STATUS_TONE[b.payment_status]
+                          b.payment_method === 'split' ? 'flame' : STATUS_TONE[b.payment_status]
                         }>
                           {b.payment_status === 'paid' && b.payment_method
                             ? b.payment_method === 'cash' ? 'Cash'

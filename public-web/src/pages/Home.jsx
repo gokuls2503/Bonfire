@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useSite } from '../lib/SiteContext'
 import { rupees, duration, formatDateTime, timeUntil, timeLabel, whatsappHref } from '../lib/format'
@@ -8,7 +9,7 @@ function Hero({ settings, stationTypes, isOpen }) {
   const totalStations = stationTypes.reduce((sum, t) => sum + t.station_count, 0)
   return (
     <section className="hero">
-      <div className="ember-grid" />
+      <div className="flame-grid" />
       <div className="glow hero__glow-a" />
       <div className="glow hero__glow-b" />
       <div className="shell hero__inner">
@@ -54,124 +55,204 @@ function Hero({ settings, stationTypes, isOpen }) {
 }
 
 function Marquee({ games }) {
+  const trackRef = useRef(null)
+  // Two copies is the minimum the -50% scroll needs, but two is only *enough*
+  // when one copy is wider than the strip. With a handful of featured games it
+  // is not, and the loop runs out mid-screen leaving a blank. So measure and
+  // repeat until one half covers the strip; always an even count, because the
+  // animation assumes the second half is identical to the first.
+  const [copies, setCopies] = useState(2)
+
+  useLayoutEffect(() => {
+    const track = trackRef.current
+    if (!track || !games.length) return undefined
+
+    const fit = () => {
+      const strip = track.parentElement.clientWidth
+      const oneCopy = track.scrollWidth / copies
+      if (!oneCopy || !strip) return
+      const needed = Math.max(2, Math.ceil(strip / oneCopy) * 2)
+      if (needed !== copies) setCopies(needed)
+    }
+
+    fit()
+    // Re-fit on resize: a narrow copy that covered a phone will not cover a
+    // desktop, and the gap would come back on rotation.
+    const observer = new ResizeObserver(fit)
+    observer.observe(track.parentElement)
+    return () => observer.disconnect()
+  }, [games, copies])
+
   if (!games.length) return null
-  const strip = [...games, ...games]
+
   return (
     <div className="marquee" aria-hidden="true">
-      <div className="marquee__track">
-        {strip.map((g, i) => (
-          <span key={i}>
-            {g.title}
-            <i>◆</i>
-          </span>
-        ))}
+      <div className="marquee__track" ref={trackRef}>
+        {Array.from({ length: copies }).flatMap((_, copy) =>
+          games.map((g, i) => (
+            <span key={`${copy}-${i}`}>
+              {g.title}
+              <i>◆</i>
+            </span>
+          )),
+        )}
       </div>
     </div>
   )
 }
 
+const splitSpec = (text) =>
+  (text || '').split('/').map((s) => s.trim()).filter(Boolean)
+
+// Presentation only: sort each spec line into a row with a matching icon.
+const SPEC_GROUPS = [
+  { icon: 'monitor', test: /\b(hz|ips|oled|tv|monitor|display|screen)\b|"/i },
+  { icon: 'keyboard', test: /\b(kb|keyboard|mouse|headset|controllers?|dualsense|pad|wheel)\b/i },
+  { icon: 'chip', test: () => true },
+]
+
+function specRows(items) {
+  const rows = SPEC_GROUPS.map((g) => ({ icon: g.icon, items: [] }))
+  items.forEach((item) => {
+    rows[SPEC_GROUPS.findIndex((g) => (typeof g.test === 'function' ? g.test(item) : g.test.test(item)))].items.push(item)
+  })
+  const order = ['chip', 'monitor', 'keyboard']
+  return rows
+    .filter((r) => r.items.length)
+    .sort((a, b) => order.indexOf(a.icon) - order.indexOf(b.icon))
+    .map((r) => ({
+      icon: r.icon === 'keyboard' && r.items.some((i) => /controller|dualsense|pad/i.test(i)) ? 'gamepad' : r.icon,
+      title: r.items.slice(0, 2).join(' / '),
+      sub: r.items.slice(2).join(' / '),
+    }))
+}
+
+// Built-in renders used until staff upload their own image in the admin.
+const FALLBACK_ART = { monitor: '/stations/pc.jpg', gamepad: '/stations/ps5.jpg' }
+
+// Split a tagline so its second half can take the flame gradient.
+function Tagline({ text }) {
+  const words = (text || '').replace(/\.$/, '').split(' ').filter(Boolean)
+  if (!words.length) return null
+  const cut = Math.ceil(words.length / 2)
+  return (
+    <p className="station-card__tagline">
+      <span>{words.slice(0, cut).join(' ')}</span>{' '}
+      <span className="flame-text">{words.slice(cut).join(' ')}.</span>
+    </p>
+  )
+}
+
 function StationTypes({ types }) {
   return (
-    <section className="section" id="stations">
+    <section className="section stations-section" id="stations">
+      <div className="stations-section__streaks" aria-hidden="true" />
       <div className="shell">
-        <div className="section-head">
-          <span className="eyebrow">The setup</span>
-          <h2>Pick your weapon</h2>
+        <div className="section-head stations-section__head">
+          <span className="eyebrow"><b>//</b> The setup</span>
+          <h2>Pick your <span className="flame-text">weapon</span></h2>
           <p>
             Every seat is built to run modern titles without an apology. No shared GPUs,
             no 60Hz panels, no "it usually works".
           </p>
         </div>
 
-        <div className="grid grid--2">
-          {types.map((type) => (
-            <article key={type.id} className="station-card card card--hover">
-              <div className="station-card__head">
-                <span className="station-card__icon">
-                  <Icon name={type.icon} size={26} />
-                </span>
-                <div>
-                  <h3>{type.name}</h3>
-                  <span className="tag tag--ember">
-                    {type.station_count} available
-                  </span>
-                </div>
-              </div>
-              <p className="muted">{type.description || type.short_description}</p>
+        <div className="station-grid">
+          {types.map((type) => {
+            const station = type.stations?.[0]
+            const specs = splitSpec(station?.specs)
+            const peripherals = splitSpec(station?.peripherals).filter((p) => !specs.includes(p))
+            const rows = specRows([...specs, ...peripherals])
+            const free = type.stations?.filter((s) => s.status === 'available').length ?? 0
+            const art = type.image || FALLBACK_ART[type.icon]
+            // "From" has to quote the same money the rates page does. For a
+            // console that is the cheapest per-controller rate, not plan.price,
+            // which stops being the selling price once the grid takes over.
+            const planPrice = (p) =>
+              type.prices_per_controller
+                ? Number(p.controller_rates?.[0]?.price_per_controller ?? p.price)
+                : Number(p.price)
+            const cheapest = [...(type.pricing_plans || [])]
+              .sort((a, b) => planPrice(a) - planPrice(b))[0]
 
-              {type.stations?.[0]?.specs && (
-                <div className="station-card__specs">
-                  <span className="small muted">Spec</span>
-                  <p>{type.stations[0].specs}</p>
-                  {type.stations[0].peripherals && (
-                    <p className="small muted">{type.stations[0].peripherals}</p>
-                  )}
-                </div>
-              )}
+            return (
+              <article key={type.id} className="station-card">
+                <div className="station-card__frame">
+                  <div className={`station-card__media ${art ? 'has-image' : ''}`}>
+                    {art ? (
+                      <img src={art} alt={type.name} loading="lazy" />
+                    ) : (
+                      <span className="station-card__hero-icon" aria-hidden="true">
+                        <Icon name={type.icon} size={96} />
+                      </span>
+                    )}
+                    <span className="station-card__plinth" aria-hidden="true" />
+                  </div>
 
-              <div className="station-card__seats">
-                {type.stations?.map((s) => (
-                  <span key={s.id} className={`seat seat--${s.status}`} title={`${s.name} — ${s.status}`}>
-                    {s.name}
-                  </span>
-                ))}
-              </div>
-
-              <div className="station-card__foot">
-                <span>
-                  from <strong>{rupees(Math.min(...(type.pricing_plans.map((p) => Number(p.price)) || [0])))}</strong>
-                </span>
-                <Link to={`/book?type=${type.id}`} className="btn btn--sm">Book this</Link>
-              </div>
-            </article>
-          ))}
-        </div>
-      </div>
-    </section>
-  )
-}
-
-function Pricing({ types }) {
-  return (
-    <section className="section pricing-section" id="rates">
-      <div className="shell">
-        <div className="section-head">
-          <span className="eyebrow">Rates</span>
-          <h2>Honest pricing</h2>
-          <p>Pay at the counter. No membership fee, no surprise charges, no minimum spend.</p>
-        </div>
-
-        <div className="grid grid--2">
-          {types.map((type) => (
-            <div key={type.id} className="price-block">
-              <div className="price-block__head">
-                <Icon name={type.icon} size={20} />
-                <h3>{type.name}</h3>
-              </div>
-              <ul className="price-list">
-                {type.pricing_plans.map((plan) => (
-                  <li key={plan.id} className={plan.badge ? 'is-highlight' : ''}>
-                    <div>
-                      <strong>{plan.name}</strong>
-                      {plan.badge && <span className="tag tag--ember">{plan.badge}</span>}
-                      {plan.description && <p className="small muted">{plan.description}</p>}
+                  <div className="station-card__body">
+                    <div className="station-card__head">
+                      <span className="station-card__icon">
+                        <Icon name={type.icon} size={24} />
+                      </span>
+                      <h3>{type.name}</h3>
+                      <span className={`station-card__avail ${free ? '' : 'is-full'}`}>
+                        {free} available
+                      </span>
                     </div>
-                    <div className="price-list__amount">
-                      {plan.compare_at_price && (
-                        <s className="small muted">{rupees(plan.compare_at_price)}</s>
-                      )}
-                      <strong>{rupees(plan.price)}</strong>
-                      <span className="small muted">{duration(plan.duration_minutes)}</span>
+
+                    <Tagline text={type.short_description} />
+                    <p className="station-card__desc">{type.description}</p>
+
+                    {rows.length > 0 && (
+                      <div className="station-card__specs">
+                        <span className="station-card__label">Specifications</span>
+                        <ul>
+                          {rows.map((row) => (
+                            <li key={row.title}>
+                              <span className="station-card__spec-icon"><Icon name={row.icon} size={18} /></span>
+                              <span>
+                                <strong>{row.title}</strong>
+                                {row.sub && <small>{row.sub}</small>}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {type.stations?.length > 0 && (
+                      <div className="station-card__seats">
+                        {type.stations.map((s) => (
+                          <span key={s.id} className={`seat seat--${s.status}`} title={`${s.name} — ${s.status}`}>
+                            {s.name}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="station-card__foot">
+                      <div className="station-card__price">
+                        <span>from</span>
+                        <strong className="flame-text">
+                          {rupees(cheapest ? planPrice(cheapest) : 0)}
+                        </strong>
+                        {cheapest && (
+                          <span>
+                            / {duration(cheapest.duration_minutes)}
+                            {type.prices_per_controller && ' per controller'}
+                          </span>
+                        )}
+                      </div>
+                      <Link to={`/book?type=${type.id}`} className="station-card__cta">
+                        <span>Book this</span> <Icon name="arrow" size={18} />
+                      </Link>
                     </div>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
+                  </div>
+                </div>
+              </article>
+            )
+          })}
         </div>
-        <p className="center muted small pricing-note">
-          Rates are per station. PS5 sessions cover up to 2 players on one screen.
-        </p>
       </div>
     </section>
   )
@@ -207,7 +288,7 @@ function Tournaments({ tournaments }) {
               )}
               <div className="tourney-card__body">
                 <div className="row row--wrap" style={{ gap: '0.5rem' }}>
-                  <span className="tag tag--ember">{t.game}</span>
+                  <span className="tag tag--flame">{t.game}</span>
                   {t.team_size > 1 && <span className="tag">{t.team_size}v{t.team_size}</span>}
                 </div>
                 <h3>{t.title}</h3>
@@ -242,43 +323,130 @@ function Tournaments({ tournaments }) {
   )
 }
 
-function Games({ games }) {
-  if (!games.length) return null
+// Genre -> tile colours for games without an uploaded cover.
+const GENRE_HUES = {
+  fps: ['#00c0f0', '#052a38'],
+  'battle royale': ['#8b5cf6', '#221046'],
+  sports: ['#22c55e', '#0a2c17'],
+  fighting: ['#e11d48', '#3a0615'],
+  racing: ['#3b82f6', '#0b1d45'],
+  sandbox: ['#84cc16', '#1f2e06'],
+  'open world': ['#14b8a6', '#062a26'],
+  action: ['#f43f5e', '#2a0a12'],
+}
+
+const initials = (title) =>
+  title.replace(/[^A-Za-z0-9 ]/g, ' ').split(' ').filter(Boolean)
+    .filter((w) => !/^(of|the|and|a)$/i.test(w)).slice(0, 2).map((w) => w[0]).join('').toUpperCase()
+
+function GameArt({ game }) {
+  // Admin-uploaded cover first, then the bundled art in /public/games, then the initials tile.
+  const [failed, setFailed] = useState(false)
+  const src = game.cover || `/games/${game.slug}.jpg`
+  if (!failed) return <img src={src} alt="" loading="lazy" onError={() => setFailed(true)} />
+  const [hue, deep] = GENRE_HUES[(game.genre || '').toLowerCase()] || ['#00a8f0', '#021826']
   return (
-    <section className="section section--tight">
+    <span className="game-tile__art" style={{ '--hue': hue, '--deep': deep }} aria-hidden="true">
+      <b>{initials(game.title)}</b>
+      <small>{game.genre}</small>
+    </span>
+  )
+}
+
+function Games({ games, types }) {
+  if (!games.length) return null
+  const iconFor = Object.fromEntries((types || []).map((t) => [t.id, t.icon]))
+  return (
+    <section className="section section--tight library-section">
+      <div className="library-section__bg" aria-hidden="true">
+        <Icon name="gamepad" size={520} />
+      </div>
       <div className="shell">
-        <div className="section-head">
-          <span className="eyebrow">Installed &amp; ready</span>
-          <h2>The library</h2>
+        <div className="library-section__top">
+          <div className="section-head library-section__head">
+            <span className="eyebrow">Installed &amp; ready</span>
+            <h2>The <span className="flame-text">library</span></h2>
+            <p>Your favourite games, installed and ready to play. Walk in and pick one.</p>
+          </div>
+          <p className="library-section__motto" aria-hidden="true">Play<br />Connect<br />Compete</p>
         </div>
+
         <div className="game-grid">
           {games.map((g) => (
-            <div key={g.id} className={`game-chip ${g.is_featured ? 'is-featured' : ''}`}>
-              {g.cover && <img src={g.cover} alt="" />}
-              <div>
+            <Link
+              key={g.id}
+              to={g.platforms?.length ? `/book?type=${g.platforms[0]}` : '/book'}
+              className="game-tile"
+              aria-label={`Book a seat for ${g.title}`}
+            >
+              <span className="game-tile__cover"><GameArt game={g} /></span>
+              <span className="game-tile__info">
                 <strong>{g.title}</strong>
-                <span className="small muted">{g.platform_names.join(' · ') || g.genre}</span>
-              </div>
-            </div>
+                <span className="game-tile__platforms">
+                  {g.platform_names.length
+                    ? g.platform_names.map((name, i) => (
+                        <span key={name}>
+                          <Icon name={iconFor[g.platforms?.[i]] || 'monitor'} size={13} />
+                          {name}
+                        </span>
+                      ))
+                    : <span>{g.genre}</span>}
+                </span>
+              </span>
+              <span className="game-tile__ready">
+                <Icon name="check" size={11} /> Ready
+              </span>
+              <span className="game-tile__play" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="12" height="12"><path d="M8 5v14l11-7z" fill="currentColor" /></svg>
+              </span>
+            </Link>
           ))}
         </div>
-        <p className="muted small" style={{ marginTop: '1.5rem' }}>
-          Want something that isn't here? Ask at the counter — we install on request.
-        </p>
+
+        <div className="library-request">
+          <span className="library-request__icon"><Icon name="gamepad" size={30} /></span>
+          <div>
+            <strong>Want something that isn't here?</strong>
+            <span>Ask at the counter — we install on request.</span>
+          </div>
+          <Link to="/visit#contact" className="library-request__cta">
+            <Icon name="arrow" size={14} /> Request a game
+          </Link>
+        </div>
       </div>
     </section>
   )
 }
 
+// Last word of the heading gets the big flame treatment ("... for / GAMERS").
+function AboutHeading({ text }) {
+  const words = (text || '').trim().split(' ')
+  if (words.length < 2) return <h2>{text}</h2>
+  return (
+    <h2 className="about-heading">
+      <span>{words.slice(0, -1).join(' ')}</span>
+      <span className="about-heading__big flame-text">{words.at(-1)}</span>
+    </h2>
+  )
+}
+
 function About({ settings, gallery }) {
+  // First gallery photo leads; the bundled render stands in until one is uploaded.
+  const [lead, ...rest] = gallery
+  const visual = lead?.image || '/about/room.jpg'
   return (
     <section className="section about-section">
+      <div className="about-visual" aria-hidden={!lead}>
+        <img src={visual} alt={lead?.caption || ''} loading="lazy" />
+        <p className="about-visual__motto" aria-hidden="true">Play<br />Connect<br />Compete</p>
+      </div>
+
       <div className="shell about-grid">
-        <div>
+        <div className="about-copy">
           <span className="eyebrow">The place</span>
-          <h2>{settings.about_heading}</h2>
-          {settings.about_body?.split('\n\n').map((para, i) => (
-            <p key={i} className="lead" style={{ marginTop: '1.25rem' }}>{para}</p>
+          <AboutHeading text={settings.about_heading} />
+          {settings.about_body?.split(/\r?\n\r?\n/).map((para, i) => (
+            <p key={i} className="about-copy__body">{para}</p>
           ))}
           <div className="perks">
             {[
@@ -288,58 +456,26 @@ function About({ settings, gallery }) {
               ['clock', 'Open late', 'Weekend nights run past midnight'],
             ].map(([icon, title, sub]) => (
               <div key={title} className="perk">
-                <Icon name={icon} size={18} />
+                <span className="perk__icon"><Icon name={icon} size={22} /></span>
                 <div>
                   <strong>{title}</strong>
-                  <span className="small muted">{sub}</span>
+                  <span>{sub}</span>
                 </div>
               </div>
             ))}
           </div>
         </div>
-        {gallery.length > 0 && (
-          <div className="about-gallery">
-            {gallery.slice(0, 5).map((img, i) => (
-              <figure key={img.id} className={`about-gallery__item i${i}`}>
+
+        {rest.length > 0 && (
+          <div className="about-thumbs">
+            {rest.slice(0, 4).map((img) => (
+              <figure key={img.id}>
                 <img src={img.image} alt={img.caption || ''} loading="lazy" />
                 {img.caption && <figcaption>{img.caption}</figcaption>}
               </figure>
             ))}
           </div>
         )}
-      </div>
-    </section>
-  )
-}
-
-function Testimonials({ items }) {
-  if (!items.length) return null
-  return (
-    <section className="section section--tight">
-      <div className="shell">
-        <div className="section-head">
-          <span className="eyebrow">Word of mouth</span>
-          <h2>What the regulars say</h2>
-        </div>
-        <div className="grid grid--3">
-          {items.map((t) => (
-            <blockquote key={t.id} className="quote card">
-              <div className="quote__stars" aria-label={`${t.rating} out of 5`}>
-                {Array.from({ length: t.rating }).map((_, i) => (
-                  <Icon key={i} name="star" size={15} />
-                ))}
-              </div>
-              <p>“{t.quote}”</p>
-              <footer>
-                {t.avatar && <img src={t.avatar} alt="" />}
-                <div>
-                  <strong>{t.name}</strong>
-                  {t.handle && <span className="small muted">{t.handle}</span>}
-                </div>
-              </footer>
-            </blockquote>
-          ))}
-        </div>
       </div>
     </section>
   )
@@ -354,6 +490,15 @@ function FAQs({ faqs }) {
           <span className="eyebrow">Good to know</span>
           <h2>Questions, answered</h2>
           <p>Anything else, just call or drop us a message.</p>
+          <div className="faq-visual" aria-hidden="true">
+            <div className="faq-visual__stage">
+              <span className="faq-visual__ghost g1">?</span>
+              <span className="faq-visual__ghost g2">?</span>
+              <span className="faq-visual__ghost g3">?</span>
+              <span className="faq-visual__mark">?</span>
+              <span className="faq-visual__plinth" />
+            </div>
+          </div>
         </div>
         <div className="faq-list">
           {faqs.map((f) => (
@@ -407,11 +552,9 @@ export default function Home() {
       <Hero settings={s} stationTypes={types} isOpen={data.is_open_now} />
       <Marquee games={data.featured_games.filter((g) => g.is_featured)} />
       <StationTypes types={types} />
-      <Pricing types={types} />
       <Tournaments tournaments={data.upcoming_tournaments} />
-      <Games games={data.featured_games} />
+      <Games games={data.featured_games} types={types} />
       <About settings={s} gallery={data.gallery} />
-      <Testimonials items={data.testimonials} />
       <FAQs faqs={data.faqs} />
       <CTA settings={s} />
     </>

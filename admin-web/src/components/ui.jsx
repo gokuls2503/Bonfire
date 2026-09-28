@@ -152,7 +152,7 @@ export const STATUS_TONE = {
   draft: '',
   open: 'ok',
   full: 'warn',
-  live: 'ember',
+  live: 'flame',
   waitlist: 'warn',
   rejected: 'bad',
   withdrawn: 'bad',

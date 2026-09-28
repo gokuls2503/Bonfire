@@ -11,8 +11,11 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.bookings.models import Booking, BusinessHours
-from apps.catalog.models import Game, PricingPlan, Station, StationType
+from apps.catalog.models import (
+    ControllerRate, Game, PricingPlan, Station, StationType,
+)
 from apps.content.models import FAQ, SiteSettings, Testimonial
+from apps.memberships.models import MembershipPlan
 from apps.shop.models import Product, ProductCategory
 from apps.tournaments.models import Tournament, TournamentRegistration
 
@@ -40,6 +43,7 @@ class Command(BaseCommand):
         self._testimonials()
         self._tournaments(pc, ps5)
         self._shop()
+        self._memberships(pc, ps5)
         if options["demo"]:
             self._demo_data(pc, ps5)
         self.stdout.write(self.style.SUCCESS("Bonfire seed complete."))
@@ -116,7 +120,8 @@ class Command(BaseCommand):
                     "Perfect for FIFA nights, fighting games and split-screen chaos."
                 ),
                 "icon": "gamepad",
-                "max_players_per_station": 2,
+                "max_players_per_station": 4,
+                "prices_per_controller": True,
                 "sort_order": 2,
             },
         )
@@ -146,7 +151,7 @@ class Command(BaseCommand):
             (pc, "Happy Hour", 60, "50", "Weekday deal", 4, "Mon-Fri, 11am to 3pm."),
             (pc, "5-Hour Pack", 300, "300", "Best value", 5, "Use it in one sitting."),
             (ps5, "30 Minutes", 30, "50", "", 1, ""),
-            (ps5, "1 Hour", 60, "90", "Popular", 2, "Up to 2 players."),
+            (ps5, "1 Hour", 60, "90", "Popular", 2, "Priced per controller."),
             (ps5, "2 Hours", 120, "170", "", 3, "Save Rs 10."),
             (ps5, "5-Hour Pack", 300, "400", "Best value", 4, "Bring the squad."),
         ]
@@ -159,8 +164,75 @@ class Command(BaseCommand):
             if created and name == "Happy Hour":
                 plan.available_from = time(11, 0)
                 plan.available_to = time(15, 0)
+                # Advertised on the rates page, sold at the counter. The booking
+                # flow picks a slot days ahead and cannot know whether the
+                # customer turns up inside the window.
+                plan.is_bookable = False
                 plan.save()
+        self._controller_rates(ps5)
         self.stdout.write(f"  pricing plans: {PricingPlan.objects.count()}")
+
+    def _controller_rates(self, ps5):
+        """A console is one screen a group shares, so it is priced per controller.
+
+        Each person pays less as the group grows while the console earns more.
+        Only the one-hour row is a real figure; the rest are scaled from it and
+        are meant to be reviewed in the admin, since a five-hour pack at five
+        times the hourly rate is a placeholder, not a pack price.
+        """
+        hourly = {1: "200", 2: "150", 3: "125", 4: "100"}
+        for plan in ps5.pricing_plans.all():
+            hours = Decimal(plan.duration_minutes) / Decimal("60")
+            for controllers, rate in hourly.items():
+                ControllerRate.objects.get_or_create(
+                    plan=plan,
+                    controllers=controllers,
+                    defaults={"price_per_controller":
+                              (Decimal(rate) * hours).quantize(Decimal("0.01"))},
+                )
+        self.stdout.write(f"  controller rates: {ControllerRate.objects.count()}")
+
+    def _memberships(self, pc, ps5):
+        """Starter schemes. Rates and perks are all editable in the admin.
+
+        `perks` lists only the extras. Included hours and the member discount
+        have their own fields and the site renders them itself, so repeating
+        them here would print every benefit twice.
+        """
+        plans = [
+            {
+                "name": "Monthly Casual", "price": "999", "duration_days": 30,
+                "discount_percent": "10", "included_hours": "15", "sort_order": 1,
+                "description": "For a couple of evenings a week.",
+                "perks": "Skip the queue at weekends\nBring a friend on your rate once a month",
+                "types": [pc, ps5],
+            },
+            {
+                "name": "Monthly Gold", "price": "1799", "compare_at_price": "2200",
+                "duration_days": 30, "discount_percent": "20", "included_hours": "35",
+                "badge": "Popular", "sort_order": 2,
+                "description": "The sweet spot for most regulars.",
+                "perks": ("Free tournament entry once a month\n"
+                          "Priority seat at weekends\nFirst pick of the new releases"),
+                "types": [pc, ps5],
+            },
+            {
+                "name": "PC Grinder", "price": "2499", "duration_days": 30,
+                "discount_percent": "25", "included_hours": "60",
+                "badge": "Best value", "sort_order": 3,
+                "description": "For the regulars who are here most evenings.",
+                "perks": "Reserved peripherals locker\nPriority seat any night\nFree tournament entry",
+                "types": [pc],
+            },
+        ]
+        for row in plans:
+            types = row.pop("types")
+            plan, created = MembershipPlan.objects.get_or_create(
+                name=row.pop("name"), defaults=row
+            )
+            if created:
+                plan.station_types.set(types)
+        self.stdout.write(f"  membership plans: {MembershipPlan.objects.count()}")
 
     def _hours(self):
         for weekday in range(7):

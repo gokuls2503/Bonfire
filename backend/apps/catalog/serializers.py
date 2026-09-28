@@ -1,17 +1,26 @@
 from rest_framework import serializers
 
-from .models import Game, PricingPlan, Station, StationType
+from .models import ControllerRate, Game, PricingPlan, Station, StationType
+
+
+class ControllerRateSerializer(serializers.ModelSerializer):
+    total = serializers.DecimalField(max_digits=9, decimal_places=2, read_only=True)
+
+    class Meta:
+        model = ControllerRate
+        fields = ["id", "plan", "controllers", "price_per_controller", "total"]
 
 
 class PricingPlanSerializer(serializers.ModelSerializer):
     station_type_name = serializers.CharField(source="station_type.name", read_only=True)
+    controller_rates = ControllerRateSerializer(many=True, read_only=True)
 
     class Meta:
         model = PricingPlan
         fields = [
             "id", "station_type", "station_type_name", "name", "duration_minutes", "price",
             "compare_at_price", "badge", "description", "available_from", "available_to",
-            "sort_order", "is_active",
+            "sort_order", "is_active", "is_bookable", "controller_rates",
         ]
 
 
@@ -37,8 +46,8 @@ class StationTypeSerializer(serializers.ModelSerializer):
         model = StationType
         fields = [
             "id", "name", "slug", "short_description", "description", "icon", "image",
-            "max_players_per_station", "sort_order", "is_active", "station_count",
-            "pricing_plans", "stations",
+            "max_players_per_station", "prices_per_controller", "sort_order", "is_active",
+            "station_count", "pricing_plans", "stations",
         ]
 
     def get_pricing_plans(self, obj):
@@ -59,7 +68,7 @@ class StationTypeWriteSerializer(serializers.ModelSerializer):
         model = StationType
         fields = [
             "id", "name", "slug", "short_description", "description", "icon", "image",
-            "max_players_per_station", "sort_order", "is_active",
+            "max_players_per_station", "prices_per_controller", "sort_order", "is_active",
         ]
         extra_kwargs = {"slug": {"required": False}}
 

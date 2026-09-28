@@ -54,7 +54,7 @@ function HoursEditor() {
                   <input type="checkbox" checked={h.is_closed} disabled={busy === h.id}
                     onChange={(e) => save(h, { is_closed: e.target.checked })}
                     aria-label={`${h.weekday_display} closed`}
-                    style={{ width: 16, height: 16, accentColor: 'var(--ember-500)' }} />
+                    style={{ width: 16, height: 16, accentColor: 'var(--flame-500)' }} />
                 </td>
               </tr>
             ))}

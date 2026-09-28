@@ -14,6 +14,7 @@ const NAV = [
       { to: '/sales', label: 'Sales', icon: 'flame' },
       { to: '/floor', label: 'Floor', icon: 'monitor' },
       { to: '/customers', label: 'Customers', icon: 'users' },
+      { to: '/memberships', label: 'Memberships', icon: 'badge' },
     ],
   },
   {
@@ -29,6 +30,7 @@ const NAV = [
       { to: '/stations', label: 'Stations', icon: 'gamepad' },
       { to: '/products', label: 'Shop items', icon: 'star' },
       { to: '/pricing', label: 'Pricing', icon: 'bolt' },
+      { to: '/membership-plans', label: 'Membership plans', icon: 'badge' },
       { to: '/hours', label: 'Hours & closures', icon: 'clock' },
       { to: '/games', label: 'Game library', icon: 'star' },
     ],

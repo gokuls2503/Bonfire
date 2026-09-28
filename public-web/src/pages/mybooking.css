@@ -28,7 +28,7 @@
   padding-top: 1.25rem;
   border-top: 1px solid var(--ink-700);
 }
-.lookup-result__tip svg { color: var(--ember-400); flex-shrink: 0; }
+.lookup-result__tip svg { color: var(--flame-400); flex-shrink: 0; }
 
 .booking-list { display: flex; flex-direction: column; gap: 1rem; }
 
@@ -54,9 +54,9 @@
 .booking-card__head > div { display: flex; align-items: baseline; gap: 0.6rem; }
 .booking-card__head strong { font-size: 1.05rem; letter-spacing: 0.08em; }
 .booking-card__seq {
-  font-family: var(--font-display);
+  font-family: var(--font-display); font-style: italic;
   font-size: 1.5rem;
-  color: var(--ember-400);
+  color: var(--flame-400);
   line-height: 1;
 }
 
@@ -100,5 +100,5 @@
   border-radius: var(--r-md);
   padding: 0.6rem 0.85rem;
 }
-.booking-card__cancel input:focus { border-color: var(--ember-500); outline: none; }
+.booking-card__cancel input:focus { border-color: var(--flame-500); outline: none; }
 .booking-card__cancel .error { color: var(--bad); }

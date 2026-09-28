@@ -240,7 +240,7 @@ function StockModal({ product, onSaved, onClose }) {
           {change !== '' && (
             <div>
               <span className="small muted">After this change</span>
-              <strong className="ember">{preview}</strong>
+              <strong className="flame">{preview}</strong>
             </div>
           )}
         </div>

@@ -25,7 +25,17 @@ class StationType(TimeStamped):
         help_text="Icon key rendered by the frontend (monitor, gamepad, wheel, vr, headset).",
     )
     image = models.ImageField(upload_to="station-types/", blank=True, null=True)
-    max_players_per_station = models.PositiveSmallIntegerField(default=1)
+    max_players_per_station = models.PositiveSmallIntegerField(
+        default=1,
+        help_text="How many people share one station. For a console priced per "
+                  "controller, this is the most controllers one unit takes.",
+    )
+    prices_per_controller = models.BooleanField(
+        default=False,
+        help_text="Charge by controller rather than by station. A console seats a "
+                  "group on one screen, so the rate is set per controller and "
+                  "drops as more join.",
+    )
     sort_order = models.PositiveSmallIntegerField(default=0)
     is_active = models.BooleanField(default=True)
 
@@ -75,7 +85,15 @@ class Station(TimeStamped):
 
 
 class PricingPlan(TimeStamped):
-    """A sellable block of time on a station type."""
+    """A sellable block of time on a station type.
+
+    Two separate switches, because "advertise it" and "let people book it" are
+    different questions. `is_active` puts a rate on the public site;
+    `is_bookable` decides whether the booking flow will take it. A happy-hour
+    rate wants the first without the second: the booking flow picks a slot days
+    ahead and has no idea whether the customer will arrive inside the window,
+    so offering it there just sells the discount to everyone.
+    """
 
     station_type = models.ForeignKey(
         StationType, on_delete=models.CASCADE, related_name="pricing_plans"
@@ -92,13 +110,93 @@ class PricingPlan(TimeStamped):
     available_from = models.TimeField(null=True, blank=True, help_text="Happy-hour window start.")
     available_to = models.TimeField(null=True, blank=True)
     sort_order = models.PositiveSmallIntegerField(default=0)
-    is_active = models.BooleanField(default=True)
+    is_active = models.BooleanField(default=True, help_text="Show this rate on the public site.")
+    is_bookable = models.BooleanField(
+        default=True,
+        help_text="Offer this plan in the online booking flow. Uncheck for a rate "
+                  "that is advertised but only sold at the counter — a happy-hour "
+                  "deal, say, where the discount depends on when you actually turn up.",
+    )
 
     class Meta:
         ordering = ("station_type__sort_order", "sort_order", "duration_minutes")
 
     def __str__(self):
         return f"{self.station_type.name} - {self.name}"
+
+    def rate_for(self, controllers):
+        """The per-controller rate at this group size, or None if unpriced.
+
+        Falls back to the largest configured count below the one asked for, so
+        a plan priced up to 4 still answers for 5 rather than failing. A plan
+        with no rates at all returns None, which is what the callers treat as
+        "this plan is not sold per controller".
+        """
+        rates = {r.controllers: r for r in self.controller_rates.all()}
+        if not rates:
+            return None
+        if controllers in rates:
+            return rates[controllers]
+        below = [c for c in rates if c <= controllers]
+        return rates[max(below)] if below else rates[min(rates)]
+
+    def price_for(self, controllers=1, seats=1):
+        """What this plan costs for one booking.
+
+        Per-controller plans multiply the group rate by the group size; every
+        other plan is a flat price per station. Either way the answer is the
+        line the customer pays, so nothing else has to know which kind it is.
+        """
+        from decimal import Decimal
+
+        # Coerced, because a plan built in the same breath still holds whatever
+        # type it was assigned, and these are money.
+        if self.station_type.prices_per_controller:
+            rate = self.rate_for(controllers)
+            if rate is not None:
+                return (Decimal(str(rate.price_per_controller))
+                        * Decimal(controllers) * Decimal(seats)).quantize(Decimal("0.01"))
+        return (Decimal(str(self.price)) * Decimal(seats)).quantize(Decimal("0.01"))
+
+
+class ControllerRate(TimeStamped):
+    """What one controller costs on a plan, at a given group size.
+
+    The rate is per controller and falls as the group grows — four people on
+    one console pay less each than one person alone, while the console earns
+    more overall. Stored per (plan, controllers) rather than as a formula,
+    because the owner sets these by hand and they are not a clean curve.
+    """
+
+    plan = models.ForeignKey(
+        PricingPlan, on_delete=models.CASCADE, related_name="controller_rates"
+    )
+    controllers = models.PositiveSmallIntegerField(
+        validators=[MinValueValidator(1)], help_text="How many controllers are in use."
+    )
+    price_per_controller = models.DecimalField(
+        max_digits=8, decimal_places=2,
+        help_text="Charged for each controller at this group size.",
+    )
+
+    class Meta:
+        ordering = ("plan", "controllers")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("plan", "controllers"), name="unique_rate_per_group_size"
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.plan} - {self.controllers}x @ {self.price_per_controller}"
+
+    @property
+    def total(self):
+        """What the whole group pays, which is what a customer actually compares."""
+        from decimal import Decimal
+
+        return (Decimal(str(self.price_per_controller))
+                * Decimal(self.controllers)).quantize(Decimal("0.01"))
 
 
 class Game(TimeStamped):

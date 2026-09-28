@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
 import { useSite } from '../lib/SiteContext'
-import { telHref, timeLabel } from '../lib/format'
+import { mapLink, telHref, timeLabel, whatsappHref } from '../lib/format'
 import Icon from './Icon'
 import './layout.css'
 
@@ -116,11 +116,17 @@ export function Footer() {
   const { data } = useSite()
   const s = data?.settings
   const hours = data?.business_hours || []
+  // WhatsApp and Maps are not socials, but in the footer they are the same
+  // thing to a customer: the ways to reach us that are not a phone call.
+  // Labels are explicit because a row of icons alone gives a screen reader
+  // nothing, and these three go to very different places.
   const socials = [
-    ['instagram', s?.instagram_url],
-    ['youtube', s?.youtube_url],
-    ['discord', s?.discord_url],
-    ['x', s?.x_url],
+    ['instagram', s?.instagram_url, 'Instagram'],
+    ['whatsapp', s?.whatsapp && whatsappHref(s.whatsapp), 'WhatsApp'],
+    ['map', mapLink(s), 'Find us on Google Maps'],
+    ['youtube', s?.youtube_url, 'YouTube'],
+    ['discord', s?.discord_url, 'Discord'],
+    ['x', s?.x_url, 'X'],
   ].filter(([, url]) => url)
 
   return (
@@ -131,8 +137,9 @@ export function Footer() {
           <p className="muted small">{s?.tagline}</p>
           {socials.length > 0 && (
             <div className="footer__socials">
-              {socials.map(([name, url]) => (
-                <a key={name} href={url} target="_blank" rel="noreferrer noopener" aria-label={name}>
+              {socials.map(([name, url, label]) => (
+                <a key={name} href={url} target="_blank" rel="noreferrer noopener"
+                   aria-label={label} title={label}>
                   <Icon name={name} size={18} />
                 </a>
               ))}

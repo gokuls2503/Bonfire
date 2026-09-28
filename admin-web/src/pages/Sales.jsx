@@ -22,7 +22,7 @@ const PRESETS = [
 
 const METHOD_COLOR = {
   cash: '#35c67a',
-  upi: '#ff7a18',
+  upi: '#00a8f0',
   card: '#4d9fff',
   other: '#8d8b86',
   unrecorded: '#3a3a46',
@@ -106,7 +106,8 @@ export default function Sales() {
         header.join(','),
         ...res.transactions.map((t) => [
           formatDay(t.settled_at), formatTime(t.settled_at), t.reference,
-          { booking: 'Session', entry_fee: 'Entry fee', counter_sale: 'Counter sale' }[t.kind]
+          { booking: 'Session', entry_fee: 'Entry fee', counter_sale: 'Counter sale',
+            membership: 'Membership' }[t.kind]
             || t.kind,
           t.customer, t.phone, t.detail, t.method_label, t.amount,
         ].map(escape).join(',')),
@@ -160,7 +161,7 @@ export default function Sales() {
       </div>
 
       <div className="sales-stats">
-        <Stat icon="flame" label="Total takings" value={rupees(t.revenue)} tone="ember"
+        <Stat icon="flame" label="Total takings" value={rupees(t.revenue)} tone="flame"
           sub={`${rupees(t.avg_per_day)} a day average`} />
         <Stat icon="check" label="Cash" value={rupees(t.cash)} tone="ok"
           sub={`${t.cash_share}% of takings`} />
@@ -211,7 +212,7 @@ export default function Sales() {
                 tickFormatter={(v) => (data.range.days > 14 ? v.slice(8) : v)} />
               <YAxis stroke="#6b6a66" fontSize={11} tickLine={false} axisLine={false}
                 tickFormatter={(v) => (v >= 1000 ? `${v / 1000}k` : v)} />
-              <Tooltip content={DayTooltip} cursor={{ fill: 'rgba(255,77,13,0.06)' }} />
+              <Tooltip content={DayTooltip} cursor={{ fill: 'rgba(0, 120, 240, 0.06)' }} />
               <Bar dataKey="cash" stackId="a" fill={METHOD_COLOR.cash} maxBarSize={40} />
               <Bar dataKey="online" stackId="a" fill={METHOD_COLOR.upi} radius={[3, 3, 0, 0]} maxBarSize={40} />
             </BarChart>
@@ -290,6 +291,15 @@ export default function Sales() {
                     <td><strong>Counter sales</strong></td>
                     <td colSpan={2} className="muted small">walk-in shop</td>
                     <td><strong>{rupees(t.counter_sales_revenue)}</strong></td>
+                  </tr>
+                )}
+                {t.memberships_revenue > 0 && (
+                  <tr>
+                    <td><strong>Memberships</strong></td>
+                    <td colSpan={2} className="muted small">
+                      {t.memberships_sold} sold
+                    </td>
+                    <td><strong>{rupees(t.memberships_revenue)}</strong></td>
                   </tr>
                 )}
               </tbody>

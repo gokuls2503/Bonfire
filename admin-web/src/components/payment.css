@@ -9,7 +9,7 @@
   margin-bottom: 1.25rem;
 }
 .pay-summary > div { display: flex; flex-direction: column; gap: 0.15rem; }
-.pay-summary__due { color: var(--ember-300); font-family: var(--font-display); font-size: 1.5rem; }
+.pay-summary__due { color: var(--flame-300); font-family: var(--font-display); font-size: 1.5rem; }
 
 .pay-outcome { margin-bottom: 1.25rem; width: fit-content; }
 
@@ -44,11 +44,11 @@
 .pay-method svg { color: var(--bone-600); margin-bottom: 0.3rem; }
 .pay-method:hover { border-color: var(--ink-400); }
 .pay-method.is-active {
-  border-color: var(--ember-500);
-  background: rgba(255, 77, 13, 0.09);
-  box-shadow: 0 0 0 1px var(--ember-500);
+  border-color: var(--flame-500);
+  background: rgba(0, 120, 240, 0.09);
+  box-shadow: 0 0 0 1px var(--flame-500);
 }
-.pay-method.is-active svg { color: var(--ember-400); }
+.pay-method.is-active svg { color: var(--flame-400); }
 
 /* ---------- discount ---------- */
 .discount {
@@ -68,7 +68,7 @@
 .discount__input { width: 110px; }
 .discount__reason { width: 100%; margin-top: 0.5rem; }
 .discount__input:focus,
-.discount__reason:focus { border-color: var(--ember-500); outline: none; }
+.discount__reason:focus { border-color: var(--flame-500); outline: none; }
 
 .pay-label .req {
   font-style: normal;
@@ -124,7 +124,7 @@
   padding: 0.5rem 0.7rem;
   font-size: 1rem;
 }
-.split__row input:focus { border-color: var(--ember-500); outline: none; }
+.split__row input:focus { border-color: var(--flame-500); outline: none; }
 
 .split__balance {
   display: flex;
@@ -137,3 +137,20 @@
   color: var(--warn);
 }
 .split__balance.is-ok { color: var(--ok); }
+
+/* A live membership, surfaced where the money decision is made. */
+.member-flag {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0.7rem 0.85rem;
+  margin-bottom: 1rem;
+  border: 1px solid rgba(0, 120, 240, 0.35);
+  border-radius: var(--r-md);
+  background: rgba(0, 120, 240, 0.07);
+}
+.member-flag > div { display: flex; flex-direction: column; gap: 0.2rem; }
+.member-flag > div > .pill { align-self: flex-start; }
+.member-flag strong { font-size: 0.95rem; }
+.member-flag > button { margin-left: auto; }

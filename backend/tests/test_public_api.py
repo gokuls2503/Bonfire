@@ -256,3 +256,71 @@ class TestContactForm:
             "name": "Ghost", "message": "Call me",
         }, format="json")
         assert res.status_code == 400
+
+
+class TestCounterOnlyRates:
+    """Happy hour is advertised on the rates page but never sold by the booking
+    flow: it picks a slot days ahead and cannot know whether the customer turns
+    up inside the window."""
+
+    @pytest.fixture
+    def happy_hour(self, pc_type):
+        from datetime import time
+
+        from apps.catalog.models import PricingPlan
+
+        return PricingPlan.objects.create(
+            station_type=pc_type, name="Happy Hour", duration_minutes=60, price="50",
+            available_from=time(11, 0), available_to=time(15, 0), is_bookable=False,
+        )
+
+    def test_a_counter_only_rate_cannot_be_booked(
+        self, api, pcs, pc_type, happy_hour, site, tomorrow_at
+    ):
+        res = api.post(
+            "/api/public/bookings/",
+            _payload(pc_type, happy_hour, tomorrow_at()),
+            format="json",
+        )
+        assert res.status_code == 400
+        assert "counter" in str(res.data["pricing_plan"]).lower()
+        assert Booking.objects.count() == 0
+
+    def test_hiding_it_in_the_picker_is_not_the_only_guard(
+        self, api, pcs, pc_type, happy_hour, site, tomorrow_at
+    ):
+        """Posting the id directly is exactly what the server-side check is for."""
+        happy_hour.is_active = False   # not even listed on the site
+        happy_hour.save()
+        res = api.post(
+            "/api/public/bookings/",
+            _payload(pc_type, happy_hour, tomorrow_at()),
+            format="json",
+        )
+        assert res.status_code == 400
+
+    def test_ordinary_rates_still_book(self, api, pcs, pc_type, pc_plan, site, tomorrow_at):
+        res = api.post(
+            "/api/public/bookings/", _payload(pc_type, pc_plan, tomorrow_at()), format="json"
+        )
+        assert res.status_code == 201
+
+    def test_the_rate_is_still_published_for_the_rates_page(
+        self, api, pcs, pc_type, happy_hour, pc_plan, site
+    ):
+        plans = api.get("/api/public/bootstrap/").json()["station_types"][0]["pricing_plans"]
+        by_name = {p["name"]: p for p in plans}
+        assert by_name["Happy Hour"]["is_bookable"] is False
+        assert by_name["1 Hour"]["is_bookable"] is True
+        # The window is what the rates page prints next to it.
+        assert by_name["Happy Hour"]["available_from"] == "11:00:00"
+
+    def test_staff_can_flip_a_rate_between_bookable_and_counter_only(
+        self, staff_api, happy_hour
+    ):
+        res = staff_api.patch(
+            f"/api/admin/pricing-plans/{happy_hour.id}/", {"is_bookable": True}, format="json"
+        )
+        assert res.status_code == 200
+        happy_hour.refresh_from_db()
+        assert happy_hour.is_bookable is True

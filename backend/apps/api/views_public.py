@@ -19,6 +19,8 @@ from apps.content.serializers import (
     SiteSettingsSerializer, TestimonialSerializer,
 )
 from apps.customers.models import CODE_LENGTH, Customer, normalise_code
+from apps.memberships.models import MembershipPlan
+from apps.memberships.serializers import PublicMembershipPlanSerializer
 from apps.tournaments.models import Tournament
 from apps.tournaments.serializers import (
     PublicRegistrationCreateSerializer, TournamentSerializer,
@@ -60,6 +62,11 @@ def site_bootstrap(request):
                 context={"request": request},
             ).data,
             "faqs": FAQSerializer(FAQ.objects.filter(is_active=True), many=True).data,
+            "membership_plans": PublicMembershipPlanSerializer(
+                MembershipPlan.objects.filter(is_active=True, is_public=True)
+                .prefetch_related("station_types"),
+                many=True, context={"request": request},
+            ).data,
             "featured_games": GameSerializer(
                 Game.objects.filter(is_active=True).prefetch_related("platforms")[:24],
                 many=True, context={"request": request},

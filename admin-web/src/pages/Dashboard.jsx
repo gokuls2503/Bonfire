@@ -124,7 +124,7 @@ export default function Dashboard({ onData }) {
           sub={`${data.stations.available} of ${data.stations.total} stations free`} tone="ok" />
         <Stat icon="flame" label="Revenue today" value={rupees(data.today.revenue)}
           sub={`${rupees(data.today.cash)} cash · ${rupees(data.today.online)} online`}
-          tone="ember" />
+          tone="flame" />
         <Stat icon="users" label="Customers" value={data.customers.total}
           sub={`+${data.customers.new_this_week} this week`} />
       </div>
@@ -207,8 +207,8 @@ export default function Dashboard({ onData }) {
               <CartesianGrid strokeDasharray="3 3" stroke="#1f1f27" vertical={false} />
               <XAxis dataKey="label" stroke="#6b6a66" fontSize={12} tickLine={false} axisLine={false} />
               <YAxis stroke="#6b6a66" fontSize={12} tickLine={false} axisLine={false} allowDecimals={false} />
-              <Tooltip content={chartTooltip} cursor={{ fill: 'rgba(255,77,13,0.07)' }} />
-              <Bar dataKey="bookings" fill="#ff4d0d" radius={[4, 4, 0, 0]} maxBarSize={38} />
+              <Tooltip content={chartTooltip} cursor={{ fill: 'rgba(0, 120, 240, 0.07)' }} />
+              <Bar dataKey="bookings" fill="#0078f0" radius={[4, 4, 0, 0]} maxBarSize={38} />
             </BarChart>
           </ResponsiveContainer>
         </section>
@@ -218,7 +218,7 @@ export default function Dashboard({ onData }) {
           {data.next_tournament ? (
             <div className="stack" style={{ gap: '0.75rem' }}>
               <div>
-                <Pill tone="ember">{data.next_tournament.game}</Pill>
+                <Pill tone="flame">{data.next_tournament.game}</Pill>
                 <h2 style={{ margin: '0.6rem 0 0.3rem' }}>{data.next_tournament.title}</h2>
                 <p className="muted small">{data.next_tournament.tagline}</p>
               </div>

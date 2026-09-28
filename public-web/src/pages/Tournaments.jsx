@@ -74,7 +74,7 @@ export default function Tournaments() {
 
               <div className="tourney-row__main">
                 <div className="row row--wrap" style={{ gap: '0.5rem' }}>
-                  <span className="tag tag--ember">{t.game}</span>
+                  <span className="tag tag--flame">{t.game}</span>
                   <span className="tag">{t.format_display}</span>
                   {t.team_size > 1 && <span className="tag">{t.team_size}v{t.team_size}</span>}
                   {t.is_recurring_weekly && <span className="tag">Weekly</span>}

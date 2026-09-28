@@ -261,7 +261,7 @@ export default function Tournaments() {
                     </td>
                     <td>
                       <Pill tone={STATUS_TONE[t.status]}>{t.status_display}</Pill>
-                      {t.is_featured && <div style={{ marginTop: '0.25rem' }}><Pill tone="ember">Featured</Pill></div>}
+                      {t.is_featured && <div style={{ marginTop: '0.25rem' }}><Pill tone="flame">Featured</Pill></div>}
                     </td>
                     <td className="actions">
                       <Link className="btn btn--ghost btn--sm" to={`/registrations?tournament=${t.id}`}>

@@ -2,7 +2,8 @@
 
 Revenue is recognised when the money changed hands (`completed_at`), falling
 back to `start_at` for rows completed before that field was recorded. Booking
-revenue and tournament entry fees are reported separately and combined.
+revenue, tournament entry fees, counter sales and membership fees are reported
+separately and combined.
 """
 from collections import defaultdict
 from datetime import datetime, timedelta
@@ -15,6 +16,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 
 from apps.bookings.models import Booking
+from apps.memberships.models import Membership
 from apps.shop.models import BillItem, CounterSale, Payment
 from apps.tournaments.models import TournamentRegistration
 
@@ -98,6 +100,21 @@ def _paid_registrations(begin, finish):
     )
 
 
+def _paid_memberships(begin, finish):
+    """Membership fees taken in range.
+
+    A membership is its own small transaction: one tender, no bill lines, no
+    station. It is reported alongside entry fees rather than through the
+    Payment table, for the same reason they are — nothing about it splits.
+    """
+    return (
+        Membership.objects.filter(payment_status="paid")
+        .annotate(settled=Coalesce("paid_at", "updated_at"))
+        .filter(settled__gte=begin, settled__lt=finish)
+        .select_related("customer")
+    )
+
+
 def _paid_counter_sales(begin, finish):
     """Walk-in shop sales with no station booked."""
     return (
@@ -157,10 +174,12 @@ def sales(request):
     bookings = _settled_bookings(begin, finish)
     registrations = _paid_registrations(begin, finish)
     counter_sales = _paid_counter_sales(begin, finish)
+    memberships = _paid_memberships(begin, finish)
 
     booking_total = bookings.aggregate(t=_money(Sum("amount_collected")))["t"]
     entry_total = registrations.aggregate(t=_money(Sum("amount_paid")))["t"]
     counter_total = counter_sales.aggregate(t=_money(Sum("amount_collected")))["t"]
+    membership_total = memberships.aggregate(t=_money(Sum("amount_paid")))["t"]
     sessions = bookings.count()
 
     # ---- split by method, from the individual tenders ----
@@ -180,15 +199,17 @@ def sales(request):
         bucket = _bucket(method)
         bucket["amount"] += amount
         bucket["count"] += 1
-    # Entry fees are a single small tender and stay on their own field.
-    for row in registrations.values("payment_method").annotate(
-        amount=_money(Sum("amount_paid")), count=Count("id")
-    ):
-        bucket = _bucket(row["payment_method"])
-        bucket["amount"] += row["amount"]
-        bucket["count"] += row["count"]
+    # Entry fees and membership fees are single small tenders that stay on
+    # their own fields rather than going through the Payment table.
+    for source in (registrations, memberships):
+        for row in source.values("payment_method").annotate(
+            amount=_money(Sum("amount_paid")), count=Count("id")
+        ):
+            bucket = _bucket(row["payment_method"])
+            bucket["amount"] += row["amount"]
+            bucket["count"] += row["count"]
 
-    grand_total = booking_total + entry_total + counter_total
+    grand_total = booking_total + entry_total + counter_total + membership_total
     cash_total = per_method["cash"]["amount"]
     online_total = sum(per_method[m]["amount"] for m in ONLINE_METHODS)
     unrecorded_total = per_method[""]["amount"]
@@ -227,6 +248,17 @@ def sales(request):
         .values("day")
         .annotate(revenue=_money(Sum("amount_collected")))
     }
+    membership_days = {
+        row["day"]: row
+        for row in memberships.annotate(day=TruncDate("settled"))
+        .values("day")
+        .annotate(
+            revenue=_money(Sum("amount_paid")),
+            cash=_money(Sum("amount_paid", filter=Q(payment_method="cash"))),
+            online=_money(Sum("amount_paid", filter=Q(payment_method__in=ONLINE_METHODS))),
+            count=Count("id"),
+        )
+    }
     entry_days = {
         row["day"]: row
         for row in registrations.annotate(day=TruncDate("settled"))
@@ -244,7 +276,8 @@ def sales(request):
         b = booking_days.get(cursor)
         e = entry_days.get(cursor)
         c = counter_days.get(cursor)
-        parts = [p for p in (b, e, c) if p]
+        m = membership_days.get(cursor)
+        parts = [p for p in (b, e, c, m) if p]
         tendered = tender_days.get(cursor, {"cash": Decimal("0"), "online": Decimal("0")})
         by_day.append({
             "date": str(cursor),
@@ -252,11 +285,20 @@ def sales(request):
             "weekday": cursor.strftime("%a"),
             "revenue": float(sum(p["revenue"] for p in parts)),
             # Entry fees keep their own field, so add them to the right bucket.
-            "cash": float(tendered["cash"] + (e["cash"] if e else Decimal("0"))),
-            "online": float(tendered["online"] + (e["online"] if e else Decimal("0"))),
+            "cash": float(
+                tendered["cash"]
+                + (e["cash"] if e else Decimal("0"))
+                + (m["cash"] if m else Decimal("0"))
+            ),
+            "online": float(
+                tendered["online"]
+                + (e["online"] if e else Decimal("0"))
+                + (m["online"] if m else Decimal("0"))
+            ),
             "sessions": b["sessions"] if b else 0,
             "entry_fees": float(e["revenue"]) if e else 0.0,
             "counter_sales": float(c["revenue"]) if c else 0.0,
+            "memberships": float(m["revenue"]) if m else 0.0,
         })
         cursor += timedelta(days=1)
 
@@ -347,6 +389,8 @@ def sales(request):
             "bookings_revenue": float(booking_total),
             "entry_fees_revenue": float(entry_total),
             "counter_sales_revenue": float(counter_total),
+            "memberships_revenue": float(membership_total),
+            "memberships_sold": memberships.count(),
             "items_total": float(items_total),
             "units_sold": units_sold,
             "discounts": float(discounts_total),
@@ -440,6 +484,23 @@ def sales_transactions(request):
             "amount": float(r.amount_paid),
             "method": r.payment_method or "",
             "method_label": METHOD_LABELS.get(r.payment_method or "", "Unrecorded"),
+        })
+
+    memberships = _paid_memberships(begin, finish).select_related("customer")
+    if method:
+        memberships = memberships.filter(payment_method=method)
+    for m in memberships:
+        rows.append({
+            "kind": "membership",
+            "id": m.id,
+            "reference": m.code,
+            "settled_at": m.paid_at or m.updated_at,
+            "customer": m.customer.full_name,
+            "phone": m.customer.phone,
+            "detail": f"{m.plan_name} — {m.starts_on} to {m.ends_on}",
+            "amount": float(m.amount_paid),
+            "method": m.payment_method or "",
+            "method_label": METHOD_LABELS.get(m.payment_method or "", "Unrecorded"),
         })
 
     rows.sort(key=lambda r: r["settled_at"], reverse=True)

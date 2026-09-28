@@ -40,7 +40,7 @@ class BookingSerializer(serializers.ModelSerializer):
         fields = [
             "id", "code", "customer", "full_name", "phone", "email", "station_type",
             "station_type_name", "station", "station_name", "pricing_plan", "start_at",
-            "end_at", "duration_minutes", "seats", "status", "status_display",
+            "end_at", "duration_minutes", "seats", "controllers", "status", "status_display",
             "payment_status", "payment_method", "amount_due", "amount_collected",
             "items", "items_total", "total_due", "gross_due", "customer_code",
             "discount_amount", "discount_reason", "payments",
@@ -87,7 +87,7 @@ class PublicBookingCreateSerializer(serializers.ModelSerializer):
         model = Booking
         fields = [
             "id", "code", "full_name", "phone", "email", "station_type", "pricing_plan",
-            "start_at", "duration_minutes", "seats", "notes",
+            "start_at", "duration_minutes", "seats", "controllers", "notes",
         ]
         read_only_fields = ["id", "code"]
 
@@ -123,7 +123,22 @@ class PublicBookingCreateSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     {"pricing_plan": "That plan does not belong to the selected station type."}
                 )
+            # Hiding a counter-only rate in the picker is a convenience; this is
+            # the rule. Without it, a happy-hour price could be booked for any
+            # hour of the day by posting its id directly.
+            if not plan.is_bookable:
+                raise serializers.ValidationError(
+                    {"pricing_plan": f"{plan.name} is only available at the counter. "
+                                     "Pick another plan, or come in and ask for it."}
+                )
             attrs["duration_minutes"] = plan.duration_minutes
+            if plan.station_type.prices_per_controller and plan.rate_for(
+                attrs.get("controllers") or 1
+            ) is None:
+                raise serializers.ValidationError(
+                    {"pricing_plan": f"{plan.name} has no controller rates set yet. "
+                                     "Please call us to book this one."}
+                )
         booking = Booking(**attrs, status=Booking.Status.PENDING)
         try:
             booking.clean()

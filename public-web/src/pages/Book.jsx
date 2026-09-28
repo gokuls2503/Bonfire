@@ -6,6 +6,17 @@ import { rupees, duration, toDateKey, formatDay, formatTime, telHref } from '../
 import Icon from '../components/Icon'
 import './book.css'
 
+/** The per-controller rate a plan charges at this group size, if it has one. */
+const ratePer = (plan, controllers) =>
+  plan?.controller_rates?.find((r) => r.controllers === controllers)?.price_per_controller
+
+/** What one station of this plan costs for the group. Falls back to the flat
+ *  price, so a station type that is not priced per controller needs no branch. */
+const planPrice = (plan, controllers) => {
+  const rate = ratePer(plan, controllers)
+  return rate ? Number(rate) * controllers : Number(plan?.price || 0)
+}
+
 const STEPS = ['Station', 'Date & time', 'Your details', 'Done']
 
 function DatePicker({ value, onChange, horizonDays }) {
@@ -56,6 +67,7 @@ export default function Book() {
   const [typeId, setTypeId] = useState(() => Number(params.get('type')) || types[0]?.id)
   const [planId, setPlanId] = useState(null)
   const [seats, setSeats] = useState(1)
+  const [controllers, setControllers] = useState(1)
   const [date, setDate] = useState(() => toDateKey(new Date()))
   const [slot, setSlot] = useState(null)
 
@@ -69,15 +81,22 @@ export default function Book() {
   const [confirmation, setConfirmation] = useState(null)
 
   const type = types.find((t) => t.id === typeId)
-  const plan = type?.pricing_plans.find((p) => p.id === planId)
+  // Counter-only rates (happy hour) are advertised on the rates page but never
+  // offered here: this flow picks a slot days ahead and cannot know whether the
+  // customer will turn up inside the deal's window.
+  const bookablePlans = useMemo(
+    () => type?.pricing_plans.filter((p) => p.is_bookable !== false) ?? [],
+    [type],
+  )
+  const plan = bookablePlans.find((p) => p.id === planId)
   const minutes = plan?.duration_minutes || 60
 
   // Default to the first plan whenever the station type changes.
   useEffect(() => {
-    if (type && !type.pricing_plans.some((p) => p.id === planId)) {
-      setPlanId(type.pricing_plans[0]?.id ?? null)
+    if (type && !bookablePlans.some((p) => p.id === planId)) {
+      setPlanId(bookablePlans[0]?.id ?? null)
     }
-  }, [type, planId])
+  }, [type, planId, bookablePlans])
 
   // Chosen slot stops being valid the moment date/type/duration changes.
   useEffect(() => { setSlot(null) }, [date, typeId, minutes])
@@ -96,7 +115,25 @@ export default function Book() {
 
   const slots = avail?.station_types?.[0]?.slots || []
   const capacity = avail?.station_types?.[0]?.capacity ?? type?.station_count ?? 1
-  const total = plan ? Number(plan.price) * seats : 0
+  // A console is priced per controller and the rate falls as the group grows,
+  // so the figure to show is the rate for THIS group size, not the plan's own.
+  const perController = type?.prices_per_controller
+    ? plan?.controller_rates?.find((r) => r.controllers === controllers)
+    : null
+  const maxControllers = type?.prices_per_controller
+    ? (type.max_players_per_station || 1)
+    : 1
+  const total = plan
+    ? (perController
+        ? Number(perController.price_per_controller) * controllers * seats
+        : Number(plan.price) * seats)
+    : 0
+
+  // Switching to a station type that takes fewer controllers must not leave a
+  // count behind that the server would reject.
+  useEffect(() => {
+    setControllers((c) => Math.min(Math.max(c, 1), maxControllers))
+  }, [maxControllers])
 
   const goTo = (n) => { setStep(n); setBanner(null); window.scrollTo({ top: 0, behavior: 'smooth' }) }
 
@@ -113,6 +150,7 @@ export default function Book() {
         notes: form.notes.trim(),
         station_type: typeId,
         pricing_plan: planId,
+        controllers,
         start_at: slot.start,
         seats,
       })
@@ -191,7 +229,7 @@ export default function Book() {
 
               <h2 style={{ marginTop: '2.5rem' }}>How long?</h2>
               <div className="plan-picker">
-                {type?.pricing_plans.map((p) => (
+                {bookablePlans.map((p) => (
                   <button
                     key={p.id}
                     type="button"
@@ -200,14 +238,57 @@ export default function Book() {
                   >
                     <div className="row" style={{ justifyContent: 'space-between' }}>
                       <strong>{p.name}</strong>
-                      {p.badge && <span className="tag tag--ember">{p.badge}</span>}
+                      {p.badge && <span className="tag tag--flame">{p.badge}</span>}
                     </div>
-                    <span className="plan-option__price">{rupees(p.price)}</span>
-                    <span className="small muted">{duration(p.duration_minutes)}</span>
+                    <span className="plan-option__price">
+                      {rupees(planPrice(p, controllers))}
+                    </span>
+                    <span className="small muted">
+                      {duration(p.duration_minutes)}
+                      {type?.prices_per_controller && controllers > 1 && (
+                        <> · {rupees(ratePer(p, controllers))}/controller</>
+                      )}
+                    </span>
                     {p.description && <span className="small muted">{p.description}</span>}
                   </button>
                 ))}
               </div>
+
+              {type?.prices_per_controller && maxControllers > 1 && (
+                <>
+                  <h2 style={{ marginTop: '2.5rem' }}>How many controllers?</h2>
+                  <div className="controller-picker">
+                    {Array.from({ length: maxControllers }, (_, i) => i + 1).map((n) => {
+                      const rate = plan?.controller_rates?.find((r) => r.controllers === n)
+                      return (
+                        <button
+                          key={n}
+                          type="button"
+                          className={`controller-option ${n === controllers ? 'is-active' : ''}`}
+                          onClick={() => setControllers(n)}
+                        >
+                          <strong>{n}</strong>
+                          <span className="small muted">
+                            {n === 1 ? 'controller' : 'controllers'}
+                          </span>
+                          {rate && (
+                            <>
+                              <span className="controller-option__rate">
+                                {rupees(rate.price_per_controller)}
+                              </span>
+                              <span className="small muted">each · {rupees(rate.total)} total</span>
+                            </>
+                          )}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  <p className="small muted" style={{ marginTop: '0.75rem' }}>
+                    Everyone plays on the one screen. The more controllers, the less
+                    each one costs.
+                  </p>
+                </>
+              )}
 
               {type && type.station_count > 1 && (
                 <>
@@ -230,6 +311,16 @@ export default function Book() {
                       Booking {seats} of {type.station_count} {type.name}
                       {seats > 1 ? 's' : ''} — {rupees(total)} total
                     </p>
+                    {/* Without the controller count this line reads as though the
+                        total were the headline rate times the consoles, and a
+                        reader has no way to tell 1 controller each from 4. It is
+                        the count that drives the price now, so it has to show. */}
+                    {type.prices_per_controller && perController && (
+                      <p className="small muted seat-picker__breakdown">
+                        {controllers} {controllers === 1 ? 'controller' : 'controllers'} on each
+                        {seats > 1 ? ` — ${rupees(Number(perController.price_per_controller) * controllers)} per console` : ''}
+                      </p>
+                    )}
                   </div>
                 </>
               )}

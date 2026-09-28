@@ -1,0 +1,32 @@
+/* The hour allowance, read at a glance in a table cell. */
+.usage { display: flex; flex-direction: column; gap: 0.3rem; min-width: 130px; }
+.usage__bar {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--ink-700);
+  overflow: hidden;
+}
+.usage__fill {
+  display: block;
+  height: 100%;
+  background: var(--ok);
+  border-radius: 999px;
+  transition: width 0.2s ease;
+}
+.usage__fill.is-high { background: var(--warn); }
+.usage__fill.is-full { background: var(--bad); }
+
+.usage-form {
+  padding: 0.9rem;
+  margin-bottom: 1.25rem;
+  border: 1px solid var(--ink-600);
+  border-radius: var(--r-md);
+  background: var(--ink-800);
+}
+.usage-heading {
+  font-size: 0.78rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--bone-500);
+  margin-bottom: 0.5rem;
+}

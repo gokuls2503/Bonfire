@@ -18,7 +18,7 @@ table.data tr.is-low td { background: rgba(255, 176, 32, 0.045); }
 .ok { color: var(--ok); }
 .warn { color: var(--warn); }
 .bad { color: var(--bad); }
-.ember { color: var(--ember-300); }
+.flame { color: var(--flame-300); }
 
 .sales-flag.is-on {
   background: rgba(255, 176, 32, 0.2);
@@ -69,4 +69,4 @@ table.data tr.is-low td { background: rgba(255, 176, 32, 0.045); }
   border-bottom: 1px solid var(--ink-700);
 }
 .category-list li:last-child { border-bottom: none; }
-.category-list svg { color: var(--ember-400); }
+.category-list svg { color: var(--flame-400); }

@@ -11,7 +11,7 @@
   transition: all 0.18s;
 }
 .scope-tabs button:hover { border-color: var(--ink-400); }
-.scope-tabs button.is-active { border-color: var(--ember-500); background: rgba(255, 77, 13, 0.1); color: var(--ember-300); }
+.scope-tabs button.is-active { border-color: var(--flame-500); background: rgba(0, 120, 240, 0.1); color: var(--flame-300); }
 
 .tourney-list { display: flex; flex-direction: column; gap: 1.25rem; }
 .tourney-row {
@@ -33,13 +33,13 @@
   font-size: 0.7rem;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--ember-400);
+  color: var(--flame-400);
 }
-.tourney-row__date strong { font-family: var(--font-display); font-size: 2.1rem; line-height: 1.05; }
+.tourney-row__date strong { font-family: var(--font-display); font-style: italic; font-size: 2.1rem; line-height: 1.05; }
 
 .tourney-row__main { display: flex; flex-direction: column; gap: 0.6rem; min-width: 0; }
 .tourney-row__main h3 { font-size: 1.4rem; }
-.tourney-row__main .row svg { color: var(--ember-400); vertical-align: -2px; margin-right: 0.3rem; }
+.tourney-row__main .row svg { color: var(--flame-400); vertical-align: -2px; margin-right: 0.3rem; }
 
 .tourney-row__aside { display: flex; flex-direction: column; gap: 0.7rem; }
 .tourney-row__prize {
@@ -51,7 +51,7 @@
   background: var(--ink-900);
   border: 1px solid var(--ink-600);
 }
-.tourney-row__prize strong { font-family: var(--font-display); font-size: 1.9rem; line-height: 1.1; }
+.tourney-row__prize strong { font-family: var(--font-display); font-style: italic; font-size: 1.9rem; line-height: 1.1; }
 
 @media (max-width: 860px) {
   .tourney-row { grid-template-columns: 68px 1fr; }
@@ -75,7 +75,7 @@
 .tourney-hero__inner { position: relative; }
 .tourney-hero h1 { margin: 1.25rem 0 0.75rem; font-size: clamp(2.2rem, 6vw, 4rem); max-width: 18ch; }
 .back-link { display: inline-flex; align-items: center; gap: 0.4rem; transition: color 0.18s; }
-.back-link:hover { color: var(--ember-400); }
+.back-link:hover { color: var(--flame-400); }
 
 .tourney-detail {
   display: grid;
@@ -115,13 +115,13 @@
   width: 28px; height: 28px;
   display: grid; place-items: center;
   border-radius: 50%;
-  font-family: var(--font-display);
+  font-family: var(--font-display); font-style: italic;
   font-size: 0.9rem;
   background: var(--ink-600);
   color: var(--bone-300);
   flex-shrink: 0;
 }
-.prize-rank.r0 { background: linear-gradient(140deg, var(--ember-300), var(--ember-500)); color: #180a02; }
+.prize-rank.r0 { background: linear-gradient(140deg, var(--flame-300), var(--flame-500)); color: #021826; }
 .prize-rank.r1 { background: var(--ink-400); color: var(--bone-100); }
 
 .register-card { position: sticky; top: calc(var(--nav-h) + 1.5rem); }

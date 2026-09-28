@@ -85,12 +85,12 @@ export default function Messages({ onCountChange }) {
               </thead>
               <tbody>
                 {items.map((m) => (
-                  <tr key={m.id} style={m.is_read ? undefined : { background: 'rgba(255,77,13,0.04)' }}>
+                  <tr key={m.id} style={m.is_read ? undefined : { background: 'rgba(0, 120, 240, 0.04)' }}>
                     <td>
                       <strong>{m.name}</strong>
                       <div className="small muted">{m.phone || m.email}</div>
                     </td>
-                    <td><Pill tone={m.is_read ? '' : 'ember'}>{m.topic_display}</Pill></td>
+                    <td><Pill tone={m.is_read ? '' : 'flame'}>{m.topic_display}</Pill></td>
                     <td className="small muted" style={{ maxWidth: 380 }}>
                       {m.message.slice(0, 110)}{m.message.length > 110 ? '…' : ''}
                     </td>

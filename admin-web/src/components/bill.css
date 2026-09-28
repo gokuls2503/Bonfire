@@ -41,7 +41,7 @@
   cursor: pointer;
   line-height: 1;
 }
-.qty button:hover:not(:disabled) { background: var(--ink-700); color: var(--ember-300); }
+.qty button:hover:not(:disabled) { background: var(--ink-700); color: var(--flame-300); }
 .qty button:disabled { opacity: 0.4; cursor: wait; }
 .qty span { min-width: 22px; text-align: center; font-size: 0.85rem; font-weight: 600; }
 
@@ -64,10 +64,10 @@
   font-weight: 700;
 }
 .bill__summary-total span:first-child { color: var(--bone-100) !important; }
-.bill__summary-total span:last-child { color: var(--ember-300); font-size: 1.1rem; }
+.bill__summary-total span:last-child { color: var(--flame-300); font-size: 1.1rem; }
 
 .bill-total { display: flex; flex-direction: column; }
-.bill-total strong { font-family: var(--font-display); font-size: 1.5rem; color: var(--ember-300); }
+.bill-total strong { font-family: var(--font-display); font-size: 1.5rem; color: var(--flame-300); }
 
 /* ---------- the menu ---------- */
 .bill__menu {
@@ -89,7 +89,7 @@
   padding: 0.45rem 0.7rem;
   width: 100%;
 }
-.bill__menu-filters input:focus { border-color: var(--ember-500); outline: none; }
+.bill__menu-filters input:focus { border-color: var(--flame-500); outline: none; }
 
 .menu-grid {
   display: grid;
@@ -114,8 +114,8 @@
   transition: all 0.14s var(--ease);
 }
 .menu-item:hover:not(:disabled) {
-  border-color: var(--ember-500);
-  background: rgba(255, 77, 13, 0.08);
+  border-color: var(--flame-500);
+  background: rgba(0, 120, 240, 0.08);
   transform: translateY(-1px);
 }
 .menu-item:disabled { opacity: 0.38; cursor: not-allowed; }
@@ -124,7 +124,7 @@
   font-weight: 600;
   line-height: 1.25;
 }
-.menu-item__price { font-size: 0.9rem; color: var(--ember-300); font-weight: 700; }
+.menu-item__price { font-size: 0.9rem; color: var(--flame-300); font-weight: 700; }
 .menu-item__price em { font-style: normal; font-size: 0.7rem; color: var(--bone-500); }
 .menu-item__stock { font-size: 0.7rem; color: var(--bone-600); }
 .menu-item.is-out .menu-item__stock { color: var(--bad); }

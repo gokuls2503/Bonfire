@@ -27,7 +27,7 @@
   background: var(--ink-900);
 }
 .counter__total span { font-size: 0.8rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--bone-500); }
-.counter__total strong { font-family: var(--font-display); font-size: 1.9rem; color: var(--ember-300); line-height: 1; }
+.counter__total strong { font-family: var(--font-display); font-size: 1.9rem; color: var(--flame-300); line-height: 1; }
 
 .counter__who summary {
   cursor: pointer;
@@ -37,7 +37,7 @@
   list-style: none;
 }
 .counter__who summary::-webkit-details-marker { display: none; }
-.counter__who summary::before { content: '+ '; color: var(--ember-400); }
+.counter__who summary::before { content: '+ '; color: var(--flame-400); }
 .counter__who[open] summary::before { content: '− '; }
 .counter__who summary:hover { color: var(--bone-100); }
 .counter__who input {
@@ -47,4 +47,4 @@
   padding: 0.5rem 0.7rem;
   width: 100%;
 }
-.counter__who input:focus { border-color: var(--ember-500); outline: none; }
+.counter__who input:focus { border-color: var(--flame-500); outline: none; }

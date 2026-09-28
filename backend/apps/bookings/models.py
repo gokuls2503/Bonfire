@@ -121,6 +121,11 @@ class Booking(TimeStamped):
     seats = models.PositiveSmallIntegerField(
         default=1, help_text="How many stations of this type the booking holds."
     )
+    controllers = models.PositiveSmallIntegerField(
+        default=1,
+        help_text="Controllers in use on each station, for a console priced per "
+                  "controller. Ignored by station types priced per seat.",
+    )
 
     status = models.CharField(max_length=12, choices=Status.choices, default=Status.PENDING, db_index=True)
     payment_status = models.CharField(
@@ -194,6 +199,13 @@ class Booking(TimeStamped):
     def clean(self):
         if self.start_at and self.start_at < timezone.now() - timedelta(minutes=5) and not self.pk:
             raise ValidationError({"start_at": "Start time is in the past."})
+        if self.station_type_id and self.controllers:
+            most = self.station_type.max_players_per_station or 1
+            if self.controllers > most:
+                raise ValidationError(
+                    {"controllers": f"A {self.station_type.name} takes at most "
+                                    f"{most} controller(s)."}
+                )
         if self.seats and self.station_type_id:
             capacity = self.capacity()
             if self.seats > capacity:
@@ -220,7 +232,11 @@ class Booking(TimeStamped):
                 self.customer.next_booking_code() if self.customer else make_orphan_code()
             )
         if not self.amount_due and self.pricing_plan_id:
-            self.amount_due = self.pricing_plan.price * self.seats
+            # The plan knows whether it is priced per station or per controller,
+            # so the booking never has to branch on station type here.
+            self.amount_due = self.pricing_plan.price_for(
+                controllers=self.controllers or 1, seats=self.seats
+            )
         super().save(*args, **kwargs)
 
     @property

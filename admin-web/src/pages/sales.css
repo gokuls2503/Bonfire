@@ -15,11 +15,11 @@
   flex-direction: column;
   gap: 0.15rem;
 }
-.sales-stat--ember { border-left-color: var(--ember-500); }
+.sales-stat--flame { border-left-color: var(--flame-500); }
 .sales-stat--ok { border-left-color: var(--ok); }
 .sales-stat--info { border-left-color: var(--info); }
 .sales-stat__icon { position: absolute; top: 1.1rem; right: 1.1rem; color: var(--bone-600); }
-.sales-stat--ember .sales-stat__icon { color: var(--ember-400); }
+.sales-stat--flame .sales-stat__icon { color: var(--flame-400); }
 .sales-stat--ok .sales-stat__icon { color: var(--ok); }
 .sales-stat--info .sales-stat__icon { color: var(--info); }
 .sales-stat__label {
@@ -30,7 +30,7 @@
   color: var(--bone-500);
 }
 .sales-stat__value { font-family: var(--font-display); font-size: 2rem; line-height: 1.1; }
-.sales-stat--ember .sales-stat__value { color: var(--ember-300); }
+.sales-stat--flame .sales-stat__value { color: var(--flame-300); }
 .sales-stat--ok .sales-stat__value { color: var(--ok); }
 .sales-stat--info .sales-stat__value { color: var(--info); }
 .sales-stat__sub { font-size: 0.78rem; color: var(--bone-500); }
@@ -82,4 +82,4 @@
 }
 .method-list li:last-child { border-bottom: none; }
 
-.sales-owed { font-family: var(--font-display); font-size: 1.25rem; color: var(--ember-300); }
+.sales-owed { font-family: var(--font-display); font-size: 1.25rem; color: var(--flame-300); }
